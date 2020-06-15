@@ -45,7 +45,7 @@ class ExifTool(object):
             output += os.read(fd, 4096).decode('utf-8')
         return output[:-len(ExifTool.SENTINEL)]
 
-    def get_metadata(self, filenames):
+    def get_metadata(self, filenames) -> dict:
         """ reads EXIF data from a single file or a file list
             as filenames path as string is alllowed or a list of path strings 
             returns metadata as dictionary with filename as key """
@@ -64,6 +64,40 @@ class ExifTool(object):
             meta_data_list[file_name] = meta_data
 
         return meta_data_list
+    
+    @staticmethod
+    def create_meta_hierarchy_tags(meta_hierarchy_raw:list,debug=False) -> dict:
+        """ Creates hierarchical meta data from raw file (1 tab = 1 level) 
+            Example
+            m1
+                m1.1
+                m1.2
+            m2
+                m2.1
+                    m2.1.1
+            will create the following hierarchical metadata tags as dict 
+            ["m1|m1.1","m1|m1.2","m2|m2.1|m2.1.1"]
+        """ 
+        hier_tag_dict = {}
+        hier_meta_dict = {}
+        sep = "|"  
+        for meta_raw in meta_hierarchy_raw:
+            level_current = meta_raw.count("\t")
+            tag = meta_raw.replace("\t","").strip()
+            hier_tag = ""
+            hier_meta_dict[level_current] = tag   
+            max_level = max(hier_meta_dict.keys())   
+            del_range = range(level_current+1,max_level+1)  
+            [hier_meta_dict.pop(m) for m in del_range] 
+            hier_tag_list = [hier_meta_dict[m] for m in range(level_current)]     
+            hier_tag_list.append(tag)
+            hier_tag = sep.join(hier_tag_list)
+            if debug is True:
+                print(f"Level:",level_current,"(",tag,") -> ",hier_tag)
+            hier_tag_dict[tag] = hier_tag
+
+        return hier_tag_dict
+
     
     # def write_metadata(self):
     #     file_name = file_dir + self.SEPARATOR + r"1.jpg"
