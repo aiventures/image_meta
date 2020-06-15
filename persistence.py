@@ -18,13 +18,13 @@ class Persistence:
         self.debug = debug
         self.path = path
 
-    def get_file_names(self,extension="jpg"):
+    def get_file_names(self,file_type="jpg"):
         """ reads all file names for a given file extension (default jpg) """
         files = None
         if os.path.isdir(self.path) is False:
             print(f"[Persistence] {self.path} is not a directory")
         else:
-            file_mask = self.path + Persistence.PATH_SEPARATOR + "*." + extension
+            file_mask = self.path + Persistence.PATH_SEPARATOR + "*." + file_type
             files = glob.glob(file_mask)
         return files
 
@@ -94,10 +94,52 @@ class Persistence:
                         print(f"Running watch: heart rate {heart_rate} cadence {cadence} ")
                     print(f"elevation {ele} last coordinate {url}")
 
-        return gps_dict      
+        return gps_dict  
+
+    @staticmethod
+    def read_json(filepath:str):   
+        """ Reads JSON file"""  
+        data = None
+        
+        if not os.path.isfile(filepath):
+            print(f"File path {filepath} does not exist. Exiting...")
+            return None
+        
+        try:
+            with open(filepath) as json_file:
+                    data = json.load(json_file)                    
+        except:
+            print(f"Error opening {filepath}")
+            print(traceback.format_exc())
+            
+        return data
+
+    @staticmethod            
+    def save_json(filepath,data:dict):     
+        """ Saves dictionary data as UTF8 """         
+        
+        with open(filepath, 'w', encoding='utf-8') as json_file:
+            try:
+                json.dump(data, json_file, ensure_ascii=False)
+            except:
+                print(f"Exception writing file {filepath}")
+                print(traceback.format_exc())
+                
+        return None         
+
+    @staticmethod 
+    def read_file(filepath,encoding='utf-8'):
+        """reads plain file"""
+        lines = []
+        try:
+            with open(filepath,encoding='utf-8') as fp:   
+                for line in fp:
+                    lines.append(line)
+        except:
+            print(f"Exception reading file {filepath}")
+            print(traceback.format_exc())   
+                     
+        return lines   
 
 
-
-# import glob, os, multiprocessing
-# p = multiprocessing.Pool(4)
-# p.map(os.remove, glob.glob("P*.jpg"))        
+     
