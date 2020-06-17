@@ -4,7 +4,6 @@ import subprocess
 import os
 import json
 
-# test
 class ExifTool(object):
     """ Interface to EXIF TOOL"""
     SENTINEL = "{ready}\r\n"

@@ -3,6 +3,7 @@ import glob
 import os
 import traceback
 from image_meta import util
+from image_meta.util import Util
 from xml.dom import minidom
 import pytz
 from datetime import datetime
@@ -73,7 +74,7 @@ class Persistence:
                     lon = float(trackpoint.getAttribute('lon'))
                     ele = int(float(trackpoint.getElementsByTagName('ele')[0].firstChild.data))
                     ts_s = trackpoint.getElementsByTagName('time')[0].firstChild.data
-                    ts = util.get_timestamp(ts_s)
+                    ts = Util.get_timestamp(ts_s)
                     gps_dict[ts] = {"lat":lat, "lon":lon, "ele":ele, "track_name":track_name}
                     gps_pts += 1
                     
