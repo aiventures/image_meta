@@ -6,13 +6,50 @@ import json
 
 class ExifTool(object):
     """ Interface to EXIF TOOL"""
+
     SENTINEL = "{ready}\r\n"
     SEPARATOR = "\\" 
+    NEW_LINE = "\r\n"
+
+    # relevant metadata definitions (for specification check  https://www.iptc.org/std/photometadata/documentation/) 
+    
+    # Processing
+    IMG_SEGMENT_PRC = ['ExifToolVersion', 'XMPToolkit', 'FileType', 'FileTypeExtension', 'OriginatingProgram']
+    
+    # Camera
+    IMG_SEGMENT_CAM = [ 'Make', 'Model', 'ExposureTime', 'ShutterSpeedValue', 'ShutterSpeed','ISO','ScaleFactor35efl'
+                        ,'ExposureCompensation','FocusMode','CircleOfConfusion']
+    # Lens
+    IMG_SEGMENT_LNS = [ 'FNumber', 'ApertureValue', 'Aperture','MaxApertureValue', 'FocalLength','LensFormat', 
+                        'LensSpecFeatures', 'LensMount2', 'LensMount', 'LensType',   'FOV', 'FocalLength35efl', 
+                        'FocalLengthIn35mmFormat', 'HyperfocalDistance', 'LightValue', 'LensID', 
+                        'LensSpec', 'LensInfo', 'LensModel']
+    # Descriptions
+    IMG_SEGMENT_DSC = ['CurrentIPTCDigest', 'IPTCDigest', 'CodedCharacterSet', 'Subject', 'Keywords', 
+                       'HierarchicalSubject', 'ObjectName', 'UserComment', 'Byline', 'Headline', 
+                       'BylineTitle', 'Artist', 'ImageDescription', 'CaptionAbstract', 'Category']
+    # Author
+    IMG_SEGMENT_AUT = ['WriterEditor', 'Copyright', 'CopyrightNotice', 'Credit','CopyrightFlag', 'Source', 
+                       'EditStatus', 'FixtureIdentifier', 'SpecialInstructions',  'OriginalTransmissionReference']
+    # Location
+    IMG_SEGMENT_LOC = ['City', 'Sublocation', 'ProvinceState', 'CountryPrimaryLocationCode', 'CountryPrimaryLocationName'] 
+    # GPS 
+    IMG_SEGMENT_GPS = ['GPSVersionID', 'GPSLatitudeRef', 'GPSLongitudeRef', 'GPSAltitudeRef', 'GPSTimeStamp', 'GPSMapDatum', 
+                       'GPSDateStamp', 'GPSAltitude', 'GPSDateTime', 'GPSLatitude', 'GPSLongitude', 'GPSPosition']
+    # Date 
+    IMG_SEGMENT_DATE = ['DateTimeOriginal', 'CreateDate', 'DateCreated', 'TimeCreated', 'DateTimeCreated']
+    
+    # All Segments
+    IMG_SEGMENT = [*IMG_SEGMENT_AUT,*IMG_SEGMENT_CAM,*IMG_SEGMENT_LNS,*IMG_SEGMENT_DSC,
+                   *IMG_SEGMENT_AUT,*IMG_SEGMENT_LOC,*IMG_SEGMENT_GPS,*IMG_SEGMENT_DATE]
 
     # EXIFTOOL command line parameters, refer to
     # https://exiftool.org/exiftool_pod.html
     # j: json format G:Group names c ,'%+.6f' Geo Coordinates in decimal format 
-    EXIF_AS_JSON = ('-j','-G','-c','%+.6f')
+    EXIF_AS_JSON = ('-j','-G','-s','-c','%+.8f')
+    # -output as command/arg file -args -charset UTF8 -s test.jpg
+    # -args arg format character set -s short format
+    EXIF_AS_ARG = ('-args','-s','-c','%+.8f')
 
     def __init__(self, executable,debug=False):
         if not ( os.path.isfile(executable) and "exiftool" in executable.lower() ):
@@ -44,13 +81,40 @@ class ExifTool(object):
             output += os.read(fd, 4096).decode('utf-8')
         return output[:-len(ExifTool.SENTINEL)]
 
+    def get_meta_args(self,filenames,charset="UTF8") -> dict:
+        """ reads EXIF data in args format into dictionary """
+
+        meta_arg_dict = {}
+        fileref = filenames
+        if isinstance(fileref, str):
+            fileref = [fileref]
+        arg_list = list(self.EXIF_AS_ARG)
+        arg_list = [*arg_list,'-charset',charset]
+        for f in fileref:
+            arg_dict = {}
+            args = self.execute(*arg_list,f).split(self.NEW_LINE)
+            for arg in args:
+                l = len(arg)
+                if l <= 2:
+                    continue
+                idx = arg.find("=")
+                meta_key = arg[1:idx]
+                meta_value = arg[idx+1:l]
+                arg_dict[meta_key] = meta_value
+            file_dir = arg_dict.pop("Directory",None)
+            file_name = arg_dict.pop("FileName",None)
+            file_path = os.path.join(file_dir,file_name).replace("/",self.SEPARATOR)
+            meta_arg_dict[file_path] = arg_dict    
+        
+        return meta_arg_dict
+
     def get_metadata(self, filenames) -> dict:
         """ reads EXIF data from a single file or a file list
             as filenames path as string is alllowed or a list of path strings 
             returns metadata as dictionary with filename as key """
             
         if self.debug is True:
-            print("[ExifTool] Files to be processed "+filenames)
+            print("[ExifTool] Files to be processed "+str(filenames))
         
         fileref = filenames
         if isinstance(fileref, str):

@@ -1,5 +1,7 @@
 import re
 from datetime import datetime
+from datetime import timedelta
+
 import pytz
 
 class Util:
@@ -15,8 +17,6 @@ class Util:
                             
             (<year>-<month>-<day>T<hour>-<minute>(T/<+/-time offset)    
         """
-        # validate date format "2000-05-19T15:51:46Z"
-        #timezone_utc = pytz.timezone("UTC")
         
         dt = None
 
@@ -44,7 +44,7 @@ class Util:
         elif ( len(re.findall(reg_expr_tz, datetime_s)) == 1 ): # time zone format  
             pass # this time zone already has the correct format
         else:
-            print(f"can't evaluate, time format {datetime_s} ")
+            print(f"can't evaluate time format {datetime_s} ")
             return 0
         
         if dt is None:
@@ -58,13 +58,29 @@ class Util:
         if debug is True:
             print(f"IN:{datetime_s_in}, dt:{dt}, tz:{dt.tzinfo} utc:{dt.utcoffset()}, dst:{dt.tzinfo.dst(dt)}")            
 
-
-
         ts = int(dt.timestamp())
         
         return ts
 
-    # checks for closest value in a sorted (!) list, returns index
+    @staticmethod
+    def get_time_offset(time_camera:str,time_gps:str,debug=False)->timedelta:
+        """ helps to calculate offset due to difference of GPS and Camera Time Difference
+            difference = time(gps) - time(camera) > time(gps) = time(camera) + difference
+            returns a timedelta object
+        """
+        try:
+            ts_gps = datetime.fromtimestamp(Util.get_timestamp(time_gps,debug=debug))
+            ts_cam = datetime.fromtimestamp(Util.get_timestamp(time_camera,debug=debug))
+        except:
+            raise Exception(f"GPS Timestamp {time_gps} or Camera Timestamp {time_camera} not correct") 
+
+        delta_time = ts_gps - ts_cam
+
+        if debug is True:
+            print(f"Camera:{time_camera} GPS:{time_gps} Time Offset:{(delta_time//timedelta(seconds=1))}")
+
+        return delta_time        
+
     @staticmethod
     def get_nearby_index(value,sorted_list:list,debug=False):
         """ returns index for closest value in a sorted list for a given input value,

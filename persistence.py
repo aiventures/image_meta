@@ -1,12 +1,15 @@
 import json
 import glob
 import os
+from os import listdir
 import traceback
-from image_meta import util
-from image_meta.util import Util
 from xml.dom import minidom
 import pytz
+import shutil
 from datetime import datetime
+
+from image_meta import util
+from image_meta.util import Util
 
 class Persistence:
     """ read/write data into persistence (right now, only json)"""
@@ -21,6 +24,7 @@ class Persistence:
 
     def get_file_names(self,file_type="jpg"):
         """ reads all file names for a given file extension (default jpg) """
+       
         files = None
         if os.path.isdir(self.path) is False:
             print(f"[Persistence] {self.path} is not a directory")
@@ -30,7 +34,7 @@ class Persistence:
         return files
 
     @staticmethod
-    def read_gpx(gpsx_path:str,extension="jpg",debug=False,tz=pytz.timezone("Europe/Berlin")):
+    def read_gpx(gpsx_path:str,debug=False,tz=pytz.timezone("Europe/Berlin")):
         """ reads gpx xml data, returns dict with utc timestamp as key  
             xml data format should be (also supports Track Point Extension
             for GPS smart watch)
@@ -85,7 +89,9 @@ class Persistence:
                     extension = trackpoint.getElementsByTagNameNS('*','TrackPointExtension')
                     if len(extension) == 1:                        
                         heart_rate =  int(extension[0].getElementsByTagNameNS('*','hr')[0].firstChild.data)
-                        cadence = int(extension[0].getElementsByTagNameNS('*','cad')[0].firstChild.data)                  
+                        cadence = int(extension[0].getElementsByTagNameNS('*','cad')[0].firstChild.data)     
+                        gps_dict[ts]["heart_rate"] = heart_rate  
+                        gps_dict[ts]["cadence"] = cadence       
                     
                 if (debug is True):
                     url = r"https://www.openstreetmap.org/#map=16/"+str(lat)+r"/"+str(lon)
@@ -133,7 +139,7 @@ class Persistence:
         """reads plain file"""
         lines = []
         try:
-            with open(filepath,encoding='utf-8') as fp:   
+            with open(filepath,encoding=encoding) as fp:   
                 for line in fp:
                     lines.append(line)
         except:
@@ -141,6 +147,62 @@ class Persistence:
             print(traceback.format_exc())   
                      
         return lines   
+
+    @staticmethod
+    def create_filename(filename,path=None,file_extension=None,append_timestamp=False):
+        """ helper method to create a filename based on name, path , file extension and option
+            to append a timestamp """
+
+        if append_timestamp is True:              
+            timestamp = "_"+datetime.now().strftime("%Y%m%d_%H%M%S")
+        else:
+            timestamp = ""    
+
+        if file_extension is None:
+            file_end = ""
+        else:
+            file_end = "." + file_extension
+        
+        if path is None:
+            path_save = ""
+        else:
+            path_save = path + Persistence.PATH_SEPARATOR
+
+        return path_save+filename+timestamp+file_end
+
+    @staticmethod
+    def save_file(data,filename,path=None,file_extension=None,append_timestamp=False,encoding='utf-8'):
+        """ saves data as string to file, optional with appended timestamp, returns path  """
+
+        if not ( path is None ) :
+            if not ( os.path.isdir(path) ):
+                print(f"{path} is not a valid directory")
+                return None 
+
+        file_path = Persistence.create_filename(filename,path=path,file_extension=file_extension,append_timestamp=append_timestamp)
+        s = ""
+
+        with open(file_path, 'w', encoding=encoding) as f:
+            try:
+                f.write(data)
+                s = "Data saved to " + file_path
+            except:
+                print(f"Exception writing file {filename}")
+                print(traceback.format_exc())     
+                s = "No data was saved" 
+                
+        return s        
+    
+    @staticmethod
+    def copy_files(src_path,trg_path,ext=""):
+        """copies files from one file path to another
+           filter ext can be supplied to only copy certain file types
+           returns list of copied files in target directory"""
+        
+        file_list = listdir(src_path)
+        copied_files = [shutil.copy(os.path.join(src_path,f),os.path.join(trg_path,f)) 
+                        for f in file_list if f.endswith(ext)]
+        return copied_files
 
 
      
