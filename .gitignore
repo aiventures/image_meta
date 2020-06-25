@@ -9,6 +9,8 @@ bin-release/
 .ipynb_checkpoints/
 .vscode/
 __pycache__/
+work/
+samples/
 
 # Executables
 *.swf
@@ -20,3 +22,4 @@ __pycache__/
 # Project files, i.e. `.project`, `.actionScriptProperties` and `.flexProperties`
 # should NOT be excluded as they contain compiler settings and other important
 # information for Eclipse / Flash Builder.
+config.json
