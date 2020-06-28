@@ -13,16 +13,16 @@ from image_meta.util import Util
 
 class Persistence:
     """ read/write data into persistence (right now, only json)"""
-    PATH_SEPARATOR = "\\"
+    PATH_SEPARATOR = os.sep
 
     debug = False
 
     def __init__(self,path:str,debug=False):
         """ constructor: requires file path where all data are assumed to be found"""
         self.debug = debug
-        self.path = path
+        self.path = os.path.normpath(path)
 
-    def get_file_names(self,file_type="jpg"):
+    def get_file_names(self,file_type="jp*"):
         """ reads all file names for a given file extension (default jpg) """
        
         files = None
@@ -31,6 +31,8 @@ class Persistence:
         else:
             file_mask = self.path + Persistence.PATH_SEPARATOR + "*." + file_type
             files = glob.glob(file_mask)
+        
+        files = list(map(os.path.normpath,files))
         return files
 
     @staticmethod
@@ -171,8 +173,10 @@ class Persistence:
         return path_save+filename+timestamp+file_end
 
     @staticmethod
-    def save_file(data,filename,path=None,file_extension=None,append_timestamp=False,encoding='utf-8'):
-        """ saves data as string to file, optional with appended timestamp, returns path  """
+    def save_file(data,filename,path=None,file_extension=None,append_timestamp=False,append_data=False,encoding='utf-8'):
+        """ saves data as string to file, optional with appended timestamp, returns path  
+            if file already exists and append is set to true, data will be appended
+        """
 
         if not ( path is None ) :
             if not ( os.path.isdir(path) ):
@@ -181,6 +185,10 @@ class Persistence:
 
         file_path = Persistence.create_filename(filename,path=path,file_extension=file_extension,append_timestamp=append_timestamp)
         s = ""
+
+        if ( append_data is True ) and ( os.path.isfile(file_path) ):
+            data_file = ''.join(Persistence.read_file(file_path))
+            data = data_file + data
 
         with open(file_path, 'w', encoding=encoding) as f:
             try:
