@@ -7,7 +7,7 @@ from xml.dom import minidom
 import pytz
 import shutil
 from datetime import datetime
-
+from pathlib import Path
 from image_meta import util
 from image_meta.util import Util
 
@@ -22,7 +22,7 @@ class Persistence:
         self.debug = debug
         self.path = os.path.normpath(path)
 
-    def get_file_names(self,file_type="jp*"):
+    def get_file_names(self,file_type="jp*g"):
         """ reads all file names for a given file extension (default jpg) """
        
         files = None
@@ -34,6 +34,47 @@ class Persistence:
         
         files = list(map(os.path.normpath,files))
         return files
+    
+    @staticmethod
+    def get_file_list(path,file_type_filter=None):
+        """ returns list of files for given file type (or file type list) 
+            path can be a file name, a file path, or a list 
+            of files, paths. File type none selects all files
+        """
+
+        # process input path can be a single file a list or a path, 
+        # transform raw information into list of files
+        img_list_raw = []
+        img_list = []
+
+        if isinstance(path,list):
+            img_list_raw = path
+        elif isinstance(path,str):
+            img_list_raw = [path]
+        else:
+            print(f"{path} no valid path")
+            return None
+        
+        for path_ref in img_list_raw:
+            if os.path.isdir(path_ref):
+                images = Persistence(path_ref).get_file_names(file_type="*")
+            elif os.path.isfile(path_ref):
+                images = [os.path.normpath(path_ref)]
+            else:
+                continue
+            img_list.extend(images)
+         
+        # filter items by extension
+        if not file_type_filter is None:
+            file_types = []
+            if isinstance(file_type_filter,str):
+                file_types = [file_type_filter]
+            elif isinstance(file_type_filter,list):
+                file_types = file_type_filter
+            file_types = list(map(lambda f: ("."+f.lower()), file_types))
+            img_list = list(filter(lambda p:Path(p).suffix.lower() in file_types,img_list))
+
+        return img_list
 
     @staticmethod
     def read_gpx(gpsx_path:str,debug=False,tz=pytz.timezone("Europe/Berlin")):

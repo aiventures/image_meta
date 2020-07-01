@@ -12,6 +12,7 @@ class ExifTool(object):
 
     SENTINEL = "{ready}\r\n"
     SEPARATOR = os.sep
+    EXIF_LIST_SEP = ", "
     NEW_LINE = "\r\n"
     ARGS = "args"
     COPYRIGHT = u'©'
@@ -52,16 +53,18 @@ class ExifTool(object):
     # https://exiftool.org/exiftool_pod.html
     # j: json format G:Group names c ,'%+.6f' Geo Coordinates in decimal format 
     EXIF_AS_JSON = ('-j','-G','-s','-c','%+.8f')
+    # same but short version without segments
+    EXIF_AS_JSON_SHORT = ('-j','-s','-c','%+.8f')
     
     # -output as command/arg file -args -charset UTF8 -s test.jpg
     # -args arg format character set -s short format
     EXIF_AS_ARG = ('-args','-s','-c','%+.8f')
 
     # -write metadata from command tool
-    # -m ignore minor issues -sep ", " / use comma space as separator for lists eg tags; 
+    # -m ignore minor issues -sep ", " / use "comma space" as separator for lists eg tags; 
     # @ <argsfile> use this command file 
     # -m -sep ", '-c' '%+.8f' " -charset UTF8 @ <argsfile> test.jpg
-    EXIF_ARG_WRITE = ('-m','-sep','", "','-c','%+.8f')
+    EXIF_ARG_WRITE = ('-m','-sep',EXIF_LIST_SEP,'-c','%+.8f')
 
     def __init__(self, executable,debug=False):
         if not ( os.path.isfile(executable) and "exiftool" in executable.lower() ):
@@ -123,7 +126,7 @@ class ExifTool(object):
         return meta_arg_dict
     
 
-    def write_args(self,path,append_data=False,meta_overwrite=None,metafilter=None,delete=False,charset="UTF8"):
+    def write_args(self,path,append_data=False,meta_overwrite=None,metafilter=None,delete=False,filetypes=["jpg","jpeg"],charset="UTF8"):
         """ writes arguments files with given metadata dictionary for each jpg file in given directory path
             (or in case path is a path to a single image then only this image will be processed )
             per default, all metadata is written into the files (with the exception of file information)
@@ -133,13 +136,9 @@ class ExifTool(object):
             delete controls whether data are to be deleted from image file
         """
 
-        if os.path.isdir(path):
-            img_list = Persistence(path).get_file_names()
-        elif os.path.isfile(path):
-            img_list = [os.path.normpath(path)]
-        else:
-            print(f"{path} is not a valid path or file path")
-            return None        
+
+        # gets the file list
+        img_list = Persistence.get_file_list(path=path,file_type_filter=filetypes)
         
         meta_args = self.get_meta_args(img_list)
         
@@ -149,6 +148,7 @@ class ExifTool(object):
             parent = p.parent
             name = p.stem + "." + self.ARGS
             args_filename = os.path.normpath(os.path.join(parent,name))
+
             if self.debug is True:
                 print("---------------------------------")
                 print("Metadata args File:",args_filename," Number of metadata entries:",len(meta.keys()))          
@@ -171,38 +171,47 @@ class ExifTool(object):
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             s = f"# ----- Metadata {f} from {timestamp} ------\n"
             s += self.dict2arg(meta_dict=meta,filter_list=meta_filter_keys,delete=delete)
+            
+            msg = Persistence.save_file(s,args_filename,append_data=append_data)
+            
             if self.debug is True:
                 print("Number of keys to write:",len(meta_filter_keys)) 
                 print("Args File (...) :\n",s[:min(500,len(s))])
-          
-
-#     # write to args file
-#     p = Persistence.save_file(s,arg_path,append_data=append_data)
-#     print(p, "filepath ",filepath_img, "config file",arg_path)               
-
+                print(msg)
+            
         return None
 
-    def write_img_meta(self,path,charset="UTF8") -> None:
+    def write_img_meta(self,path,filetypes=["jpg","jpeg"],charset="UTF8",show_info=False) -> None:
         """ writes metadata from args file into image files in a given directory path with extension jpg
             args file needs to have the same name as the corresponding image name 
             (test.jpg requires a test.args file )  
         """
-        if not os.path.isdir(path):
-            print(f"{path} is not a valid path")
-            return None
-        
-        path = os.path.normpath(path)
 
+        # writing params
+        args_list_raw = [*self.EXIF_ARG_WRITE,'-charset',charset,'-@']
 
-        # fileref = filenames
-        # if isinstance(fileref, str):
-        #     fileref = [fileref]
+        # get all arg files
+        arg_files = Persistence.get_file_list(path=path,file_type_filter="args")
+
+        if show_info is True:
+            print(f"WRITE IMAGE METADAT: EXIFTOOL ARGS {args_list_raw}")
+            print(f"Arg File List # files ({len(arg_files)}): {str(arg_files)[:300]} ... \nWRITING -> ",end="")   
+
+        # for each arg file get the corresponding image file
+        for arg_file in arg_files:
+            p = Path(arg_file)
+            parent = p.parent
+            stem = p.stem + "."
+            for f in filetypes:
+                img_path = os.path.join(parent,stem+f)
+                if os.path.isfile(img_path):
+                    args_list = [*args_list_raw,arg_file]
+                    self.execute(*args_list,img_path)
+                    if show_info is True:
+                        print(f".", end = "")
         
-        # arg_list_raw = list(self.EXIF_ARG_WRITE)
-        # arg_list_raw = [*arg_list_raw,'-charset',charset,'@']
-        # for f in fileref:
-        #     # get the args file / assumption has the same name as jpeg file
-        #     print(f)
+        if show_info is True:
+            print("\nWRITING IS FINISHED!")
         
         return None
 
@@ -223,26 +232,27 @@ class ExifTool(object):
             keys = list(filter(expr,meta_dict.keys()))     
 
         for k in keys:
+            v = meta_dict[k]
+            if isinstance(v,list):
+                v = ExifTool.EXIF_LIST_SEP.join(v)
             if delete is False:
-                s += ''.join(['-',k,'=',meta_dict[k],'\n'])
+                s += ''.join(['-',k,'=',v,'\n'])
             else:
                 s += ''.join(['-',k,'=\n'])
 
         return s
 
-    def get_metadata(self, filenames) -> dict:
+    def get_metadata(self, path,file_type_filter=['jpg','jpeg']) -> dict:
         """ reads EXIF data from a single file or a file list
             as filenames path as string is alllowed or a list of path strings 
             returns metadata as dictionary with filename as key """
             
-        if self.debug is True:
-            print("[ExifTool] Files to be processed "+str(filenames))
-        
-        fileref = filenames
-        if isinstance(fileref, str):
-            fileref = [fileref]
+        fileref = Persistence.get_file_list(path=path,file_type_filter=file_type_filter)
 
-        meta_data_list_raw = json.loads(self.execute(*self.EXIF_AS_JSON,*fileref))
+        if self.debug is True:
+            print("[ExifTool] Files to be processed "+str(fileref))
+
+        meta_data_list_raw = json.loads(self.execute(*self.EXIF_AS_JSON_SHORT,*fileref))
         meta_data_list = {}
         for meta_data in meta_data_list_raw:
             file_name = meta_data.pop("SourceFile",None)
