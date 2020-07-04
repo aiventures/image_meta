@@ -10,6 +10,15 @@ from pathlib import Path
 class ExifTool(object):
     """ Interface to EXIF TOOL"""
 
+    # Summary: What are methods doing? 
+    # 1a get_metadict_from_img: *[File]jpg > dictionary[filepath]:exif_data (get_meta_args)
+    # 1b get_metadict_from_img2: *[File]jpg > [data]EXIF_DATA(json) >  dictionary[filepath]:exif_data (get_metadata)
+    # 2 write_args_from_img:  *[File]jpg  > get_metadict_from_img > *[File]args (write_args)
+    # 3 write_args2img: > *[File]args  > EXIF_DATA > *[File]jpg (write_args2meta)
+    # 4 arg2dict: *[data]args > *[data]dictionary
+    # 5 dict2arg: *[data]dictionary > *[data]args
+    # 6 create_metahierarchy_from_file: *[File]Metadata Hierarchy > *[data]etahierarchy_dictionary (create_meta_hierarchy_tags)
+
     SENTINEL = "{ready}\r\n"
     SEPARATOR = os.sep
     EXIF_LIST_SEP = ", "
@@ -98,7 +107,7 @@ class ExifTool(object):
             output += os.read(fd, 4096).decode('utf-8')
         return output[:-len(ExifTool.SENTINEL)]
 
-    def get_meta_args(self,filenames,charset="UTF8") -> dict:
+    def get_metadict_from_img(self,filenames,charset="UTF8") -> dict:
         """ reads EXIF data in args format into dictionary """
 
         meta_arg_dict = {}
@@ -126,7 +135,7 @@ class ExifTool(object):
         return meta_arg_dict
     
 
-    def write_args(self,path,append_data=False,meta_overwrite=None,metafilter=None,delete=False,filetypes=["jpg","jpeg"],charset="UTF8"):
+    def write_args_from_img(self,path,append_data=False,meta_overwrite=None,metafilter=None,delete=False,filetypes=["jpg","jpeg"],charset="UTF8"):
         """ writes arguments files with given metadata dictionary for each jpg file in given directory path
             (or in case path is a path to a single image then only this image will be processed )
             per default, all metadata is written into the files (with the exception of file information)
@@ -136,11 +145,11 @@ class ExifTool(object):
             delete controls whether data are to be deleted from image file
         """
 
-
         # gets the file list
         img_list = Persistence.get_file_list(path=path,file_type_filter=filetypes)
         
-        meta_args = self.get_meta_args(img_list)
+        # reads arg metadata from image file as meta data dictionary
+        meta_args = self.get_metadict_from_img(img_list)
         
         for f,meta in meta_args.items():
             # construct new args filename
@@ -181,7 +190,7 @@ class ExifTool(object):
             
         return None
 
-    def write_img_meta(self,path,filetypes=["jpg","jpeg"],charset="UTF8",show_info=False) -> None:
+    def write_args2img(self,path,filetypes=["jpg","jpeg"],charset="UTF8",show_info=False) -> None:
         """ writes metadata from args file into image files in a given directory path with extension jpg
             args file needs to have the same name as the corresponding image name 
             (test.jpg requires a test.args file )  
@@ -216,6 +225,32 @@ class ExifTool(object):
         return None
 
     @staticmethod
+    def arg2dict(args:list,filter_list:list=None,delete:bool=False)->dict:
+        """ converts arg value list into value dict 
+            filter list to export only selected keys can also be applied
+            if delete set to true, the values will be initialized (=deleted)
+        """    
+        args_dict = {}
+        for arg in args:
+            key_raw,value_raw = arg.strip().split("=")
+            key = key_raw[1:len(key_raw)]
+            value = value_raw.split(ExifTool.EXIF_LIST_SEP)
+
+            if len(value) == 1:
+                value = value[0]
+
+            if delete is True:
+                value = ""
+
+            if ( filter_list is None ):                
+                args_dict[key] = value
+            else:
+                if key in filter_list:
+                    args_dict[key] = value
+        
+        return args_dict
+        
+    @staticmethod
     def dict2arg(meta_dict:dict,filter_list:list=None,delete:bool=False)->str:
         """ converts key value dict into arg file string 
             filter list to export only selected keys can also be applied
@@ -242,7 +277,7 @@ class ExifTool(object):
 
         return s
 
-    def get_metadata(self, path,file_type_filter=['jpg','jpeg']) -> dict:
+    def get_metadict_from_img2(self, path,file_type_filter=['jpg','jpeg']) -> dict:
         """ reads EXIF data from a single file or a file list
             as filenames path as string is alllowed or a list of path strings 
             returns metadata as dictionary with filename as key """
@@ -261,7 +296,7 @@ class ExifTool(object):
         return meta_data_list
     
     @staticmethod
-    def create_meta_hierarchy_tags(meta_hierarchy_raw:list,debug=False) -> dict:
+    def create_metahierarchy_from_file(meta_hierarchy_raw:list,debug=False) -> dict:
         """ Creates hierarchical meta data from raw file (1 tab = 1 level) 
             Example
             m1
@@ -292,18 +327,3 @@ class ExifTool(object):
             hier_tag_dict[tag] = hier_tag
 
         return hier_tag_dict
-
-    
-    # def write_metadata(self):
-    #     file_name = file_dir + self.SEPARATOR + r"1.jpg"
-    #     file_list = [file_name]
-    #     print(file_name)
-    #     #write keywords        
-    #     self.execute("-keywords=Frankx","-keywords=Und x noch einer", *file_list)  
-    #     self.execute("-xmp:subject<$iptc:keywords",*file_list)
-    #     #copy to exif
-    #     #check metadata
-    #     #meta_data = json.loads(self.execute('-j','-G','-keywords',*file_list))
-    #     #meta_data = json.loads(self.execute('-j','-G',''*filenames))
-    #     meta_data = self.get_metadata(file_name)        
-    #     return meta_data
