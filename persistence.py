@@ -178,8 +178,8 @@ class Persistence:
         return None         
 
     @staticmethod 
-    def read_file(filepath,encoding='utf-8'):
-        """reads plain file"""
+    def read_file(filepath,encoding='utf-8',show=False):
+        """reads plain file, if show is set it will be displayed"""
         lines = []
         try:
             with open(filepath,encoding=encoding) as fp:   
@@ -188,6 +188,10 @@ class Persistence:
         except:
             print(f"Exception reading file {filepath}")
             print(traceback.format_exc())   
+        
+        if show is True:
+            for line in lines:
+                print(line.strip())
                      
         return lines   
 

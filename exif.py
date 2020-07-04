@@ -107,15 +107,21 @@ class ExifTool(object):
             output += os.read(fd, 4096).decode('utf-8')
         return output[:-len(ExifTool.SENTINEL)]
 
-    def get_metadict_from_img(self,filenames,charset="UTF8") -> dict:
-        """ reads EXIF data in args format into dictionary """
+    def get_metadict_from_img(self,filenames,metafilter=None,filetypes=["jpg","jpeg"],charset="UTF8") -> dict:
+        """ reads EXIF data in args format into dictionary, with the filter list only selected metadata will be read """
 
         meta_arg_dict = {}
-        fileref = filenames
+        if not metafilter is None: 
+            metafilter = ["Directory","FileName",*metafilter]
+
+        fileref = Persistence.get_file_list(path=filenames,file_type_filter=filetypes)
+
         if isinstance(fileref, str):
             fileref = [fileref]
+
         arg_list = list(self.EXIF_AS_ARG)
         arg_list = [*arg_list,'-charset',charset]
+
         for f in fileref:
             arg_dict = {}
             args = self.execute(*arg_list,f).split(self.NEW_LINE)
@@ -125,7 +131,13 @@ class ExifTool(object):
                     continue
                 idx = arg.find("=")
                 meta_key = arg[1:idx]
+                if metafilter is not None:
+                    if not ( meta_key in metafilter ):                        
+                        continue
                 meta_value = arg[idx+1:l]
+                
+                if ExifTool.EXIF_LIST_SEP in meta_value: # values contains a list
+                    meta_value = meta_value.split(ExifTool.EXIF_LIST_SEP)
                 arg_dict[meta_key] = meta_value
             file_dir = arg_dict.get("Directory",None)
             file_name = arg_dict.get("FileName",None)
@@ -135,7 +147,7 @@ class ExifTool(object):
         return meta_arg_dict
     
 
-    def write_args_from_img(self,path,append_data=False,meta_overwrite=None,metafilter=None,delete=False,filetypes=["jpg","jpeg"],charset="UTF8"):
+    def write_args_from_img(self,path,append_data=False,meta_values:dict=None,metafilter=None,delete=False,filetypes=["jpg","jpeg"],charset="UTF8"):
         """ writes arguments files with given metadata dictionary for each jpg file in given directory path
             (or in case path is a path to a single image then only this image will be processed )
             per default, all metadata is written into the files (with the exception of file information)
@@ -143,6 +155,7 @@ class ExifTool(object):
             submitting metadata filter (=list of metadata attributes) will only write filtered attributes
             append_data allows metadata to be added to existing args files
             delete controls whether data are to be deleted from image file
+            returns list of creared args files
         """
 
         # gets the file list
@@ -150,6 +163,7 @@ class ExifTool(object):
         
         # reads arg metadata from image file as meta data dictionary
         meta_args = self.get_metadict_from_img(img_list)
+        args_files = []
         
         for f,meta in meta_args.items():
             # construct new args filename
@@ -163,8 +177,8 @@ class ExifTool(object):
                 print("Metadata args File:",args_filename," Number of metadata entries:",len(meta.keys()))          
             
             # overwrite meta values
-            if not meta_overwrite is None:
-                for k,v in meta_overwrite.items():
+            if not meta_values is None:
+                for k,v in meta_values.items():
                     meta[k] = v
             
             # delete filename / path
@@ -176,19 +190,23 @@ class ExifTool(object):
                 meta_filter_keys = meta.keys()
             else:
                 meta_filter_keys = list(filter(lambda li: li in metafilter, meta.keys()))
+                print("META",meta_filter_keys)
             
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            s = f"# ----- Metadata {f} from {timestamp} ------\n"
+            s = f"# ----- Metadata {f} ------\n"
+            s += f"#       from {timestamp} \n"
             s += self.dict2arg(meta_dict=meta,filter_list=meta_filter_keys,delete=delete)
             
             msg = Persistence.save_file(s,args_filename,append_data=append_data)
+            args_files.append(args_filename)
             
             if self.debug is True:
+                print(f"Writing {args_filename}") 
                 print("Number of keys to write:",len(meta_filter_keys)) 
                 print("Args File (...) :\n",s[:min(500,len(s))])
                 print(msg)
             
-        return None
+        return args_files
 
     def write_args2img(self,path,filetypes=["jpg","jpeg"],charset="UTF8",show_info=False) -> None:
         """ writes metadata from args file into image files in a given directory path with extension jpg
