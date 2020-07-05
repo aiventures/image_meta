@@ -58,6 +58,20 @@ class ExifTool(object):
     IMG_SEGMENT = [*IMG_SEGMENT_AUT,*IMG_SEGMENT_CAM,*IMG_SEGMENT_LNS,*IMG_SEGMENT_DSC,
                    *IMG_SEGMENT_AUT,*IMG_SEGMENT_LOC,*IMG_SEGMENT_GPS,*IMG_SEGMENT_DATE]
 
+    # Segments used for metadata
+    
+    # technical data, example
+    # Make:SONY | Model:ILCE-6500 | LensMount:E-mount | LensModel:E 18-135mm F3.5-5.6 OSS |  ExposureTime:1/13 | ISO:250 
+    # | Aperture:9.0 | FocalLength:31.0 mm | ScaleFactor35efl:1.5 | FocalLengthIn35mmFormat:46 mm |  FOV: 112.6 deg |
+    # LensFormat:APS-C | CircleOfConfusion:0.020 mm | HyperfocalDistance:5.27 m |  LightValue:8.7 | 
+    # FocusMode:AF-S  OriginatingProgram:None | 
+    IMG_SEG_TECH_USED = ["Make","Model","LensMount","LensModel","LensInfo","ExposureTime","ISO","Aperture",
+                         "FocalLength","ScaleFactor35efl","FocalLengthIn35mmFormat", "FOV","LensFormat","CircleOfConfusion",
+                         "HyperfocalDistance","LightValue","ExposureCompensation","FocusMode","FocusDistance2","Software"]
+    
+    # Metadata that contain metadata in lists
+    META_DATA_LIST = ['Keywords','HierarchicalSubject'] 
+
     # EXIFTOOL command line parameters, refer to
     # https://exiftool.org/exiftool_pod.html
     # j: json format G:Group names c ,'%+.6f' Geo Coordinates in decimal format 
@@ -107,7 +121,7 @@ class ExifTool(object):
             output += os.read(fd, 4096).decode('utf-8')
         return output[:-len(ExifTool.SENTINEL)]
 
-    def get_metadict_from_img(self,filenames,metafilter=None,filetypes=["jpg","jpeg"],charset="UTF8") -> dict:
+    def get_metadict_from_img(self,filenames,metafilter=None,filetypes=["jpg","jpeg"],list_metadata=META_DATA_LIST,charset="UTF8") -> dict:
         """ reads EXIF data in args format into dictionary, with the filter list only selected metadata will be read """
 
         meta_arg_dict = {}
@@ -125,6 +139,7 @@ class ExifTool(object):
         for f in fileref:
             arg_dict = {}
             args = self.execute(*arg_list,f).split(self.NEW_LINE)
+
             for arg in args:
                 l = len(arg)
                 if l <= 2:
@@ -136,7 +151,8 @@ class ExifTool(object):
                         continue
                 meta_value = arg[idx+1:l]
                 
-                if ExifTool.EXIF_LIST_SEP in meta_value: # values contains a list
+                # values contains a list
+                if ( meta_key in list_metadata ) : 
                     meta_value = meta_value.split(ExifTool.EXIF_LIST_SEP)
                 arg_dict[meta_key] = meta_value
             file_dir = arg_dict.get("Directory",None)
@@ -147,7 +163,7 @@ class ExifTool(object):
         return meta_arg_dict
     
 
-    def write_args_from_img(self,path,append_data=False,meta_values:dict=None,metafilter=None,delete=False,filetypes=["jpg","jpeg"],charset="UTF8"):
+    def write_args_from_img(self,path,append_data=False,meta_values:dict=None,metafilter=None,delete=False,add_digest=False,filetypes=["jpg","jpeg"],charset="UTF8"):
         """ writes arguments files with given metadata dictionary for each jpg file in given directory path
             (or in case path is a path to a single image then only this image will be processed )
             per default, all metadata is written into the files (with the exception of file information)
@@ -180,6 +196,12 @@ class ExifTool(object):
             if not meta_values is None:
                 for k,v in meta_values.items():
                     meta[k] = v
+
+            # Add IPTCdigest
+            if add_digest is True:
+                meta["IPTCDigest"] = "new"
+                if not metafilter is None:
+                    metafilter.append("IPTCDigest")
             
             # delete filename / path
             meta.pop("FileName",None)
@@ -313,6 +335,85 @@ class ExifTool(object):
 
         return meta_data_list
     
+    @staticmethod
+    def get_tech_keywords_from_metadict(metadict:dict,debug=False) -> list:
+        """ gets technical keywords from metadata dictionary """
+
+        def zip_str(s):
+            return "".join(s.split(" "))
+        
+        tech_params_out = []
+        
+        if debug is True:
+            print("--- get_tech_keywords_from_metadict---\n")
+            print(metadict)
+
+        # get make model and mount
+        lens_format = metadict.get("LensFormat","")
+        if not lens_format == '':
+            lens_format = "("+lens_format+")"
+        tech_params_out.append((" ".join([metadict.get("Make",""),metadict.get("Model",""),lens_format])).strip())    
+
+        # get lens focal length aperture and ISO
+        lens = metadict.get("LensModel","")
+        if lens == "":
+            lens = metadict.get("LensInfo","")
+        tech_params_out.append(lens)
+
+        s = "f"+zip_str(metadict.get("FocalLength","N/A"))+" F"+metadict.get("Aperture","N/A")
+        s += " T"+metadict.get("ExposureTime","N/A")+"s"
+        s += " ISO"+metadict.get("ISO","N/A")
+        tech_params_out.append(s)
+
+        # get 35mm equivalents
+        s = "f(35mm) "+zip_str(metadict.get("FocalLengthIn35mmFormat","N/A"))
+        s += " ("+metadict.get("ScaleFactor35efl","N/A")+")"
+        tech_params_out.append(s)
+        
+        # photonerd params :-)
+        coc = metadict.get("CircleOfConfusion")
+        if not coc is None:
+            coc_nm = coc.split(" ")[0]
+            try:
+                coc_nm = "coc "+str(int(1000*float(coc_nm)))+"nm"
+                tech_params_out.append(coc_nm)
+            except:
+                pass
+                
+        foc = metadict.get("FocusDistance2","")  
+        if not foc == "":
+            foc = "focus dist. "+zip_str(foc)    
+            tech_params_out.append(foc)
+            
+        hfoc = metadict.get("HyperfocalDistance","")       
+        if not hfoc == "":
+            hfoc = "hyperfocal "+zip_str(hfoc)    
+            tech_params_out.append(hfoc)
+                
+        fov = metadict.get("FOV","")
+        if not fov == "":
+            fov = "fov "+zip_str(fov)
+            tech_params_out.append(fov)
+        
+        ev = metadict.get("LightValue","")
+        if not ev == "":
+            ev= "Light "+ev+"EV"
+            tech_params_out.append(ev)
+                
+        
+        focus = metadict.get("FocusMode","")
+        if not focus == "":
+            focus= "focus "+focus
+            tech_params_out.append(focus)
+        
+        # clean out empty elements
+        tech_params_out = list(filter(lambda v:v!="",tech_params_out))
+        if debug is True:
+            print("OUT PARAMS \n",tech_params_out)    
+        
+        return tech_params_out    
+
+
     @staticmethod
     def create_metahierarchy_from_file(meta_hierarchy_raw:list,debug=False) -> dict:
         """ Creates hierarchical meta data from raw file (1 tab = 1 level) 
