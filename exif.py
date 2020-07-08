@@ -177,6 +177,8 @@ class ExifTool(object):
             returns list of creared args files
         """
 
+        metafilter = list(metafilter)
+        
         # gets the file list
         img_list = Persistence.get_file_list(path=path,file_type_filter=filetypes)
         
@@ -215,7 +217,8 @@ class ExifTool(object):
                 meta_filter_keys = meta.keys()
             else:
                 meta_filter_keys = list(filter(lambda li: li in metafilter, meta.keys()))
-                print("META",meta_filter_keys)
+                if self.debug is True:
+                    print("META",meta_filter_keys)
             
             timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
             s = f"# ----- Metadata {f} ------\n"
@@ -242,8 +245,18 @@ class ExifTool(object):
         # writing params
         args_list_raw = [*self.EXIF_ARG_WRITE,'-charset',charset,'-@']
 
-        # get all arg files
-        arg_files = Persistence.get_file_list(path=path,file_type_filter="args")
+
+        if os.path.isfile(path):
+            # single image file
+            for ty in filetypes:
+                arg_file = path.replace(ty,"args")
+                if arg_file != path:
+                    arg_files = [arg_file]
+        else:
+            # get all arg files in path
+            arg_files = Persistence.get_file_list(path=path,file_type_filter="args")
+
+        print("ARG FILES",arg_files)
 
         if show_info is True:
             print(f"WRITE IMAGE METADAT: EXIFTOOL ARGS {args_list_raw}")
@@ -313,10 +326,11 @@ class ExifTool(object):
             v = meta_dict[k]
             if isinstance(v,list):
                 v = ExifTool.EXIF_LIST_SEP.join(v)
+
             if delete is False:
-                s += ''.join(['-',k,'=',v,'\n'])
+                s += ''.join(['-',str(k),'=',str(v),'\n'])
             else:
-                s += ''.join(['-',k,'=\n'])
+                s += ''.join(['-',str(k),'=\n'])
 
         return s
 

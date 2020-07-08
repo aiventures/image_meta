@@ -119,7 +119,7 @@ class Persistence:
                 for trackpoint in trackpoints:
                     lat = float(trackpoint.getAttribute('lat'))
                     lon = float(trackpoint.getAttribute('lon'))
-                    ele = int(float(trackpoint.getElementsByTagName('ele')[0].firstChild.data))
+                    ele = float(float(trackpoint.getElementsByTagName('ele')[0].firstChild.data))
                     ts_s = trackpoint.getElementsByTagName('time')[0].firstChild.data
                     ts = Util.get_timestamp(ts_s)
                     gps_dict[ts] = {"lat":lat, "lon":lon, "ele":ele, "track_name":track_name}
