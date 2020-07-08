@@ -69,6 +69,9 @@ class ExifTool(object):
                          "FocalLength","ScaleFactor35efl","FocalLengthIn35mmFormat", "FOV","LensFormat","CircleOfConfusion",
                          "HyperfocalDistance","LightValue","ExposureCompensation","FocusMode","FocusDistance2","Software"]
     
+    # Geo Data 
+    IMG_SEG_GEO = [*IMG_SEGMENT_DATE,*IMG_SEGMENT_GPS,*IMG_SEGMENT_LOC]
+    
     # Metadata that contain metadata in lists
     META_DATA_LIST = ['Keywords','HierarchicalSubject'] 
 
@@ -350,25 +353,42 @@ class ExifTool(object):
 
         # get make model and mount
         lens_format = metadict.get("LensFormat","")
-        if not lens_format == '':
+        if not ( lens_format == '' or lens_format == 'Unknown' ):
             lens_format = "("+lens_format+")"
-        tech_params_out.append((" ".join([metadict.get("Make",""),metadict.get("Model",""),lens_format])).strip())    
+        else:
+            lens_format = ''
+        tech_params_out.append((" ".join(["CAM",metadict.get("Make",""),metadict.get("Model",""),lens_format])).strip())    
 
         # get lens focal length aperture and ISO
         lens = metadict.get("LensModel","")
         if lens == "":
             lens = metadict.get("LensInfo","")
-        tech_params_out.append(lens)
+        elif lens == "----":
+            lens = "MANUAL"
+        tech_params_out.append(("LENS "+lens))
 
-        s = "f"+zip_str(metadict.get("FocalLength","N/A"))+" F"+metadict.get("Aperture","N/A")
+        fl = zip_str(metadict.get("FocalLength","N/A"))
+        if fl[0:3] == "0.0":
+            fl = ""
+        else:
+            fl = "f"+fl
+        ap = metadict.get("Aperture","NA")
+        if ap == "NA":
+            ap = ""
+        else:
+            ap = " F"+ap
+
+        s = fl+ap
         s += " T"+metadict.get("ExposureTime","N/A")+"s"
         s += " ISO"+metadict.get("ISO","N/A")
+        s = s.strip()
         tech_params_out.append(s)
 
         # get 35mm equivalents
-        s = "f(35mm) "+zip_str(metadict.get("FocalLengthIn35mmFormat","N/A"))
-        s += " ("+metadict.get("ScaleFactor35efl","N/A")+")"
-        tech_params_out.append(s)
+        if lens != "MANUAL":
+            s = "f(35mm) "+zip_str(metadict.get("FocalLengthIn35mmFormat","N/A"))
+            s += " ("+metadict.get("ScaleFactor35efl","N/A")+")"
+            tech_params_out.append(s)
         
         # photonerd params :-)
         coc = metadict.get("CircleOfConfusion")
@@ -415,8 +435,8 @@ class ExifTool(object):
 
 
     @staticmethod
-    def create_metahierarchy_from_file(meta_hierarchy_raw:list,debug=False) -> dict:
-        """ Creates hierarchical meta data from raw file (1 tab = 1 level) 
+    def create_metahierarchy_from_str(meta_hierarchy_raw:list,debug=False) -> dict:
+        """ Creates hierarchical meta data from raw string format (1 tab = 1 level) 
             Example
             m1
                 m1.1
@@ -446,3 +466,30 @@ class ExifTool(object):
             hier_tag_dict[tag] = hier_tag
 
         return hier_tag_dict
+    
+    @staticmethod
+    def get_keywords(meta_dict:dict,new_keys:list,overwrite=False):
+        """ add new keys to Keywords list, overwrite overwrites existing keywords """
+        
+        if overwrite is False:
+            keyword_list = meta_dict.get("Keywords",[])
+        else:
+            keyword_list = []
+        
+        keyword_list =  list(dict.fromkeys([*keyword_list,*new_keys]))
+        
+        return keyword_list
+    
+    @staticmethod
+    def get_hier_subject(meta_dict:dict,hier_dict:dict={},overwrite=False):
+        """ add new keys to Hierarchival subject list, overwrite overwrites existing keywords """
+        if overwrite is False:
+            keyword_list = meta_dict.get("HierarchicalSubject",[])
+        else:
+            keyword_list = []
+        
+        keywords = meta_dict.get("Keywords",[])
+        hier_keys = filter(lambda l:(l is not None),map(lambda k:hier_dict.get(k),keywords))
+        keyword_list = list(dict.fromkeys([*keyword_list,*hier_keys]))
+        
+        return keyword_list

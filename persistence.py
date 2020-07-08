@@ -77,7 +77,7 @@ class Persistence:
         return img_list
 
     @staticmethod
-    def read_gpx(gpsx_path:str,debug=False,tz=pytz.timezone("Europe/Berlin")):
+    def read_gpx(gpsx_path:str,debug=False,tz=pytz.timezone("Europe/Berlin"))->dict:
         """ reads gpx xml data, returns dict with utc timestamp as key  
             xml data format should be (also supports Track Point Extension
             for GPS smart watch)
