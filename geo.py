@@ -4,12 +4,16 @@ from math import sin
 from math import sqrt
 from math import cos
 from math import asin
+from math import floor
 from image_meta.util import Util
 from datetime import datetime
 
 class Geo:
-    RADIUS_EARTH = 6371 
-    """ Earth Radius in kilometers """
+    """ Geo calculations"""
+
+    RADIUS_EARTH = 6371 #Earth Radius in kilometers 
+
+    URL_GEOHACK = "https://geohack.toolforge.org/geohack.php?params="
 
     @staticmethod
     def latlon2cartesian(lat_lon,radius=RADIUS_EARTH):
@@ -48,7 +52,6 @@ class Geo:
 
         lat,lon = latlon
 
-        print("xxx",lat,lon)
         latref = "N"
         lonref = "E"
 
@@ -71,4 +74,27 @@ class Geo:
             geo_dict["GPSTimeStamp"] = datetime.fromtimestamp(timestamp).strftime("%H:%M:%S") 
 
         return geo_dict 
+
+    @staticmethod
+    def dec2geo(dec):
+        """ converts decimals to geo type format"""
+        degrees = floor(dec)
+        minutes = floor(60*(dec-degrees))
+        rest = dec - degrees - ( minutes / 60 )
+        seconds = round(rest * 60 * 60)
+        return (f"{degrees:02d}_{minutes:02d}_{seconds:02d}")
+
+    @staticmethod
+    def latlon2geo(latlon):
+        """ converts latlon to decimals in geohack format """
+        lat,lon = latlon
+        lat_ref = "N"
+        lon_ref = "E"
+        if lat < 0:
+            lat_ref = "S"
+        if lon < 0:
+            lon_ref = "W"
+        lat_geo = Geo.dec2geo(abs(lat))
+        lon_geo = Geo.dec2geo(abs(lon))
+        return (lat_geo+"_"+lat_ref+"_"+lon_geo+"_"+lon_ref)
 

@@ -5,6 +5,8 @@ import os
 import json
 from datetime import datetime
 from image_meta.persistence import Persistence
+from image_meta.util import Util
+from image_meta.geo import Geo
 from pathlib import Path
 
 class ExifTool(object):
@@ -244,7 +246,7 @@ class ExifTool(object):
 
         # writing params
         args_list_raw = [*self.EXIF_ARG_WRITE,'-charset',charset,'-@']
-
+        arg_files = []
 
         if os.path.isfile(path):
             # single image file
@@ -447,6 +449,62 @@ class ExifTool(object):
         
         return tech_params_out    
 
+    @staticmethod
+    def get_gps_keywords_from_gpx(metadict:dict,gpx_dict:dict,gpx_keys:list=None,
+                                  time_offset=0,timeframe=60,debug=False) -> dict:
+        """ reads gpx tracklog data and tries to match with image timestamp 
+            time offset will be added to camera timestamp to correlate with gps time 
+            gpx_keys is the sorted list of gpx_dict_keys / timestamps (should be done before)
+            gps_timeframe is acceptable time stamp difference whether data are considered to be matching 
+            (60 seconds is set)
+            """
+        gps_dict = {}
+
+        if gpx_keys is None:
+            gpx_keys = sorted(list(gpx_dict.keys()))
+        
+        # get datetime and timestamp 
+        d = metadict.get("CreateDate",0)
+        d_ts = Util.get_timestamp(d) + time_offset
+        
+        # will return -1 if index is out of bounds
+        gpx_idx = Util.get_nearby_index(d_ts,gpx_keys,debug=False)
+        if ( gpx_idx == -1 ):
+            return gps_dict
+        d_ts_gpx  = gpx_keys[gpx_idx]       
+        delta_ts = abs(d_ts_gpx-d_ts)
+        
+        if debug is True:
+            print(f"GET GPS: Date Image {d} Timestamp {d_ts} GPX Timestamp {d_ts_gpx} Difference {delta_ts} sec")
+        
+        if ( delta_ts > timeframe ):
+            return gps_dict
+        
+        # gps from gpx file
+        gpx_lat = gpx_dict[d_ts_gpx]["lat"]
+        gpx_lon = gpx_dict[d_ts_gpx]["lon"]
+        gpx_alt = gpx_dict[d_ts_gpx]["ele"]
+        latlon_gpx = (gpx_lat,gpx_lon)
+        
+        if debug is True:
+            # existing gps data 
+            img_lat = float(metadict.get("GPSLatitude",999))
+            img_lon = float(metadict.get("GPSLongitude",999))
+            img_alt = float(metadict.get("GPSAltitude","999 m").split()[0])
+
+            # gps data in image already
+            if ( img_lat == 999 or img_lon == 999 ):
+                print("No GPS data on Image")
+            else:
+                latlon_img = (img_lat,img_lon)           
+                print(f"GPS lat lon alt from gpx: {latlon_gpx,gpx_alt}")
+                print(f"GPS lat lon alt from img: {latlon_img,img_alt}")
+                geo_diff = round(1000 * Geo.get_distance(latlon_gpx,latlon_img),1)
+                print(f"Difference GPS vs. Image {geo_diff} meters")            
+        
+        gps_dict = Geo.get_exifmeta_from_latlon(latlon=latlon_gpx,altitude=gpx_alt,timestamp=d_ts_gpx)
+
+        return gps_dict
 
     @staticmethod
     def create_metahierarchy_from_str(meta_hierarchy_raw:list,debug=False) -> dict:
