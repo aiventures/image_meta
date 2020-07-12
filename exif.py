@@ -20,6 +20,7 @@ class ExifTool(object):
     # 4 arg2dict: *[data]args > *[data]dictionary
     # 5 dict2arg: *[data]dictionary > *[data]args
     # 6 create_metahierarchy_from_file: *[File]Metadata Hierarchy > *[data]etahierarchy_dictionary (create_meta_hierarchy_tags)
+    # EXIF / IIM Specification and Examples http://www.iptc.org/std/IIM/4.2/specification/IIMV4.2.pdf 
 
     SENTINEL = "{ready}\r\n"
     SEPARATOR = os.sep
@@ -28,8 +29,53 @@ class ExifTool(object):
     ARGS = "args"
     COPYRIGHT = u'©'
 
-    # relevant metadata definitions (for specification check  https://www.iptc.org/std/photometadata/documentation/) 
-    
+    # relevant metadata definitions, for specification check  
+    # https://www.iptc.org/std/photometadata/documentation/
+    # https://exiftool.org/TagNames/IPTC.html
+    # https://de.wikipedia.org/wiki/Exchangeable_Image_File_Format
+
+    # general metadata fields
+    # [IPTC]          ObjectName                      : _TITEL
+    # [XMP]           Title                           : _TITEL
+    # [EXIF]          UserComment                     : _BENUTZERKOMMENTAR
+    # [XMP]           Label                           : _BESCHRIFTUNG
+    # [EXIF]          ImageDescription                : _BILDUNTERSCHRIFT
+    # [IPTC]          Caption-Abstract                : _BILDUNTERSCHRIFT
+    # [XMP]           Description                     : _BILDUNTERSCHRIFT
+    # [IPTC]          Headline                        : _IPTC_ÜBERSCHRIFT
+    # [EXIF]          Artist                          : _ERSTELLER
+    # [IPTC]          By-line                         : _ERSTELLER
+    # [XMP]           Creator                         : _ERSTELLER
+    # [XMP]           Rights                          : _IPTC_WF_COPYRIGHT
+    # [EXIF]          Copyright                       : _IPTC_WF_COPYRIGHT
+    # [XMP]           CaptionWriter                   : _IPTC_AUTOR_BESCHREIBUNG
+    # [XMP]           UsageTerms                      : _IPTC_WF_BED_RECHTENUITZUNGEN
+    # [IPTC]          Credit                          : _IPTC_WF_BILDRECHTE
+    # [IPTC]          Source                          : _IPTC_WF_QUELLE
+    # [IPTC]          CopyrightNotice                 : _IPTC_WF_COPYRIGHT
+    # [IPTC]          Writer-Editor                   : _IPTC_AUTOR_BESCHREIBUNG
+    # [XMP]           Subject                         : <keywords> 
+    # [IPTC]          Keywords                        : <keywords> 
+    # [XMP]           HierarchicalSubject             : <hier_keywords>
+    # [XMP]           State                           : _IPTC_BUNDESLAND
+    # [XMP]           Country                         : _IPTC_LAND
+    # [XMP]           Location                        : _IPTC_ORTSDETAIL
+    # [XMP]           CountryCode                     : DE
+    # [IPTC]          City                            : _IPTC_STADT
+    # [IPTC]          Sub-location                    : _IPTC_ORTSDETAIL
+    # [IPTC]          Province-State                  : _IPTC_BUNDESLAND
+    # [IPTC]          Country-PrimaryLocationCode     : DE
+    # [IPTC]          Country-PrimaryLocationName     : _IPTC_LAND
+    # [Composite]     GPSLatitude                     : lat 
+    # [Composite]     GPSLongitude                    : lon
+    # [Composite]     GPSPosition                     : lat lon 48
+    # [EXIF]          GPSVersionID                    : 2.2.0.0
+    # [EXIF]          GPSLatitudeRef                  : North
+    # [EXIF]          GPSLongitudeRef                 : East
+    # [EXIF]          GPSAltitude                     : 588.5435 m
+    # [EXIF]          GPSImgDirection                 : 45
+    # [Photoshop]     IPTCDigest                      : 098b116a0d6a73a5c032bddf81fd41ce
+
     # Processing
     IMG_SEGMENT_PRC = ['ExifToolVersion', 'XMPToolkit', 'FileType', 'FileTypeExtension', 'OriginatingProgram']
     
@@ -42,18 +88,30 @@ class ExifTool(object):
                         'FocalLengthIn35mmFormat', 'HyperfocalDistance', 'LightValue', 'LensID', 
                         'LensSpec', 'LensInfo', 'LensModel']
     # Descriptions
+    # 'Subject' [64],'Keywords' [*64],'HierarchicalSubject' [],'ObjectName' [64],
+    # 'UserComment' [256] -doesnt support utf8,
+    # 'Byline' [32] - Creator Name, 'Headline' [256],'BylineTitle' [32] - Title Of Creator
+    # 'Artist' [],'ImageDescription' [],'Caption-Abstract' [2000],'Category' [3]
     IMG_SEGMENT_DSC = ['CurrentIPTCDigest', 'IPTCDigest', 'CodedCharacterSet', 'Subject', 'Keywords', 
                        'HierarchicalSubject', 'ObjectName', 'UserComment', 'Byline', 'Headline', 
-                       'BylineTitle', 'Artist', 'ImageDescription', 'CaptionAbstract', 'Category']
+                       'BylineTitle', 'Artist', 'ImageDescription', 'Caption-Abstract', 'Category']
     # Author
+    # 'WriterEditor' [], 'Copyright' [], 'CopyrightNotice' [128], 'Credit' [32], 'CopyrightFlag' []
+    # 'Source' [32], 'EditStatus' [64], 'FixtureIdentifier' [32], 'SpecialInstructions' [256]
+    # 'OriginalTransmissionReference' [32]
     IMG_SEGMENT_AUT = ['WriterEditor', 'Copyright', 'CopyrightNotice', 'Credit','CopyrightFlag', 'Source', 
                        'EditStatus', 'FixtureIdentifier', 'SpecialInstructions',  'OriginalTransmissionReference']
     # Location
+    # 'City' [32], 'Sublocation' [32], 'ProvinceState' [32]. 'CountryPrimaryLocationCode' [3]
+    # 'CountryPrimaryLocationName' [64]
     IMG_SEGMENT_LOC = ['City', 'Sublocation', 'ProvinceState', 'CountryPrimaryLocationCode', 'CountryPrimaryLocationName'] 
+    
     # GPS 
     IMG_SEGMENT_GPS = ['GPSVersionID', 'GPSLatitudeRef', 'GPSLongitudeRef', 'GPSAltitudeRef', 'GPSTimeStamp', 'GPSMapDatum', 
                        'GPSDateStamp', 'GPSAltitude', 'GPSDateTime', 'GPSLatitude', 'GPSLongitude', 'GPSPosition']
-    # Date 
+    # Date
+    # 'DateTimeOriginal' [], 'CreateDate' [], 'DateCreated' [CCYYMMDD], 
+    # 'TimeCreated' [HHMMSS±HHMM], 'DateTimeCreated' [] 
     IMG_SEGMENT_DATE = ['DateTimeOriginal', 'CreateDate', 'DateCreated', 'TimeCreated', 'DateTimeCreated']
     
     # All Segments
@@ -167,6 +225,81 @@ class ExifTool(object):
         
         return meta_arg_dict
     
+    @staticmethod
+    def write_args_from_dict(path,append_data=False,meta_values:dict=None,metafilter=None,add_digest=False,delete=False,charset="UTF8",debug=False):
+        """ writes arguments file with given metadata dictionary
+            path: file path to new args file
+            append_data: Flag if any existing file should be overwritten or blended with data
+            meta_values: data to be written to args file
+            metafilter: only keys matching to list in metafilter will be written (None=all data)
+            add_digest: digest value to be written to args file
+        """
+        
+        # gets the file list
+        #img_list = Persistence.get_file_list(path=path,file_type_filter=filetypes)
+        
+        # reads arg metadata from image file as meta data dictionary
+        #meta_args = self.get_metadict_from_img(img_list)
+        #args_files = []
+        
+        #for f,meta in meta_args.items():
+            # construct new args filename
+
+        p = Path(path)
+        parent = p.parent
+        name = p.stem + "." + ExifTool.ARGS
+        args_filename = os.path.normpath(os.path.join(parent,name))
+
+        meta = {} 
+        
+        # # overwrite meta values
+        if not meta_values is None:
+            for k,v in meta_values.items():
+                meta[k] = v
+        
+        # filter list for writing
+        if metafilter is None:
+            meta_filter_keys = meta.keys()
+        else:
+            metafilter = list(metafilter)
+            meta_filter_keys = list(filter(lambda li: li in metafilter, meta.keys()))     
+
+        if debug is True:
+            print("---------------------------------")
+            print("Metadata args File:",args_filename)
+            print("Template Dict:",meta)         
+            print("Filter",metafilter,"Filtered keys",meta_filter_keys)
+
+        # Add IPTCdigest
+        if add_digest is True:
+            meta["IPTCDigest"] = "new"
+            if not metafilter is None:
+                metafilter.append("IPTCDigest")
+
+        # filter list for writing
+        if metafilter is None:
+            meta_filter_keys = meta.keys()
+        else:
+            meta_filter_keys = list(filter(lambda li: li in metafilter, meta.keys()))
+            if debug is True:
+                print("META",meta_filter_keys)
+        
+        timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        s = f"# ----- Metadata {args_filename} ------\n"
+        s += f"#       from {timestamp} \n"
+        s += ExifTool.dict2arg(meta_dict=meta,filter_list=meta_filter_keys,delete=delete)
+        
+        msg = Persistence.save_file(s,args_filename,append_data=append_data)
+        
+        if debug is True:
+            print(f"Writing {args_filename}") 
+            print("Number of keys to write:",len(meta_filter_keys)) 
+            print("Args File (...) :\n",s[:min(500,len(s))])
+            print(msg)
+            
+        # return path
+        return args_filename
+
 
     def write_args_from_img(self,path,append_data=False,meta_values:dict=None,metafilter=None,delete=False,add_digest=False,filetypes=["jpg","jpeg"],charset="UTF8"):
         """ writes arguments files with given metadata dictionary for each jpg file in given directory path
@@ -179,7 +312,8 @@ class ExifTool(object):
             returns list of creared args files
         """
 
-        metafilter = list(metafilter)
+        if not metafilter is None:
+            metafilter = list(metafilter)
         
         # gets the file list
         img_list = Persistence.get_file_list(path=path,file_type_filter=filetypes)
@@ -290,12 +424,15 @@ class ExifTool(object):
         """    
         args_dict = {}
         for arg in args:
+            if not ( arg[0] == "-" ):
+                continue
             key_raw,value_raw = arg.strip().split("=")
             key = key_raw[1:len(key_raw)]
-            value = value_raw.split(ExifTool.EXIF_LIST_SEP)
-
-            if len(value) == 1:
-                value = value[0]
+            
+            if ( key in ExifTool.META_DATA_LIST ):
+                value = value_raw.split(ExifTool.EXIF_LIST_SEP)
+            else:
+                value = value_raw
 
             if delete is True:
                 value = ""
@@ -565,3 +702,54 @@ class ExifTool(object):
         keyword_list = list(dict.fromkeys([*keyword_list,*hier_keys]))
         
         return keyword_list
+    
+    @staticmethod
+    def path2title(path,debug=False):
+        """ gets the parent path. if it conforms to the format YYYYMMDD_X_<TITLE_OTHERS> the last part
+            will be extracted. A path to a file also can be submitted. Path needs to point to a real path or file 
+        """
+        pf = Path(path)
+
+        subfolder = ""
+        #get either parent path of file or last folder 
+        if os.path.isfile(pf):
+            subfolder = pf.parts[-2]
+        elif os.path.isdir(pf):
+            subfolder = pf.parts[-1]
+
+        subfolder_elems = subfolder.split("_")
+
+        #at least three elements must be given
+        if len(subfolder_elems) >= 3:
+            title = " ".join(subfolder_elems[2:])
+        else:
+            print(f"{path} is not a path or a folder / doesnt contain _ as separator")
+            title = ""
+        
+        if debug is True:
+            print(f"Path: {path}, Title is {title}")
+
+        return title
+    
+    @staticmethod
+    def get_author_dict(author:str):
+        """ returns metadata attributes for author """   
+        author_dict = {}      
+        copyright = f"{ExifTool.COPYRIGHT} {datetime.now().strftime('%Y')} {author}"
+        author_dict['WriterEditor'] = author
+        author_dict['Copyright'] = copyright
+        author_dict['CopyrightNotice'] = "All Rights Reserved"
+        author_dict['Credit'] = author
+        author_dict['Source'] = "Photo made by Author"
+
+        return author_dict
+    
+    @staticmethod
+    def get_title_dict(title:str):
+        """ returns metadata attributes for title / descriptions """
+        meta_list = ['ObjectName','Title','Label','ImageDescription','Caption-Abstract','Description','Headline']
+        title_dict = {}      
+        [title_dict.update({d:title}) for d in meta_list]
+        return title_dict
+
+

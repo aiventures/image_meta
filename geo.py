@@ -78,14 +78,14 @@ class Geo:
     @staticmethod
     def dec2geo(dec):
         """ converts decimals to geo type format"""
-        degrees = floor(dec)
-        minutes = floor(60*(dec-degrees))
+        degrees = round(floor(dec),0)
+        minutes = round(floor(60*(dec-degrees)),0)
         rest = dec - degrees - ( minutes / 60 )
         seconds = round(rest * 60 * 60)
-        return (f"{degrees:02d}_{minutes:02d}_{seconds:02d}")
+        return(degrees,minutes,seconds)
 
     @staticmethod
-    def latlon2geo(latlon):
+    def latlon2geohack(latlon):
         """ converts latlon to decimals in geohack format """
         lat,lon = latlon
         lat_ref = "N"
@@ -94,7 +94,27 @@ class Geo:
             lat_ref = "S"
         if lon < 0:
             lon_ref = "W"
-        lat_geo = Geo.dec2geo(abs(lat))
-        lon_geo = Geo.dec2geo(abs(lon))
-        return (lat_geo+"_"+lat_ref+"_"+lon_geo+"_"+lon_ref)
+        lat_geo = list(map(lambda n:str(n),Geo.dec2geo(abs(lat))))
+        lat_geo.append(lat_ref)
+        lon_geo = list(map(lambda n:str(n),Geo.dec2geo(abs(lon))))
+        lon_geo.append(lon_ref)
+        latlon_geo = [*lat_geo,*lon_geo]
+        return "_".join(latlon_geo)
+    
+    @staticmethod
+    def geohack2dec(geohack:str):
+        """ converts geohack string into geo tuple """
+        latlon_s = geohack.split("_")
+        lat_ref = latlon_s[3]
+        lon_ref = latlon_s[7]
+        lat_f = 1.0
+        lon_f = 1.0
+        if lat_ref == "S":
+            lat_f = -1.
+        if lon_ref == "W":
+            lat_f = -1.
+        coords_geo = list(map(lambda f:float(f),[*latlon_s[:3],*latlon_s[4:7]]))
+        coords = ((lat_f*(coords_geo[0]+(coords_geo[1]/60)+(coords_geo[2]/3600)))
+                 ,(lon_f*(coords_geo[3]+(coords_geo[4]/60)+(coords_geo[5]/3600))))
+        return coords
 
