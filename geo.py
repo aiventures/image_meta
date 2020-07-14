@@ -7,6 +7,7 @@ from math import asin
 from math import floor
 from image_meta.util import Util
 from datetime import datetime
+import requests
 
 class Geo:
     """ Geo calculations"""
@@ -14,6 +15,9 @@ class Geo:
     RADIUS_EARTH = 6371 #Earth Radius in kilometers 
 
     URL_GEOHACK = "https://geohack.toolforge.org/geohack.php?params="
+    NOMINATIM_REVERSE_URL    = "https://nominatim.openstreetmap.org/reverse"
+    NOMINATIM_REVERSE_PARAMS = {'format':'geojson','lat':'0','lon':'0',
+                                'zoom':'18','addressdetails':'18','accept-language':'de'}
 
     @staticmethod
     def latlon2cartesian(lat_lon,radius=RADIUS_EARTH):
@@ -117,4 +121,115 @@ class Geo:
         coords = ((lat_f*(coords_geo[0]+(coords_geo[1]/60)+(coords_geo[2]/3600)))
                  ,(lon_f*(coords_geo[3]+(coords_geo[4]/60)+(coords_geo[5]/3600))))
         return coords
+    
+    @staticmethod 
+    def latlon2osm(latlon,detail=18):
+        """ converts latlon to osm url """
+        # https://www.openstreetmap.org/#map=<detail>/<lat>/<lon>
+        detail = str(detail)
+        lat = str(latlon[0])
+        lon = str(latlon[1])
+        return f"https://www.openstreetmap.org/#map={detail}/{lat}/{lon}"
 
+    @staticmethod
+    def nominatimreverse2dict(geo_json,debug=False):
+        """ transforms json nominatim reverse response into a plain / flattened dictionary format """
+
+        # local method to add dictionary entries
+        def add2dict(d:dict,prefix:str):
+            if d is None:
+                return {}
+            keys = []
+            trg_dict = {}
+            for k,v in d.items():
+                key = "_".join([prefix,k])
+                keys.append(key)
+                trg_dict[key] = v
+            trg_dict[("_".join([prefix,"keys"]))] = keys
+            return trg_dict
+
+        property_dict = {}  
+
+        err = geo_json.get("error",None)
+        if err is not None:
+            property_dict["error"] = err
+            return property_dict
+
+        # FeatureCollection
+        property_dict["osm_type"] = geo_json.get("type")
+        # License Notice
+        property_dict["osm_licence"] = geo_json.get("licence")
+
+        try:
+            features = geo_json.get("features")[0]
+        except:
+            print("No Features Found in OSM Data")
+            features = {}
+
+        # Feature
+        property_dict["features_type"] = features.get("type")
+
+        # Properties
+        # 'place_id', 'osm_type', 'osm_id', 'place_rank', 'category', 'type', 'importance', 
+        # 'addresstype', 'name', 'display_name']
+        try:
+            properties = features["properties"]
+        except:
+            print("No Properties Found in OSM Data")
+            properties = {}
+
+        for k,v in properties.items():
+            if isinstance(v,str):
+                property_dict[("properties_"+k)] = v
+
+        properties = {"address":properties.get("address"),
+                      "extratag":properties.get("extratags"),
+                      "namedetail":properties.get("namedetails")}
+
+        for k,v in properties.items():
+                d = add2dict(v,k)
+                property_dict.update(d)
+            
+        # list lat_min lon_min lat_max lat min
+        try:
+            bbox = list(map(lambda v:float(v),features.get("bbox")))
+            bbox = list(map(lambda c:round(c,5),bbox))
+            latlon_min = [bbox[1],bbox[0]]
+            latlon_max = [bbox[3],bbox[2]]
+            property_dict["latlon_min"] = latlon_min 
+            property_dict["latlon_max"] = latlon_max
+            # calculate distance in m
+            property_dict["distance"] = round(Geo.get_distance(latlon_min,latlon_max)*1000)
+        except:
+            property_dict["latlon_min"] = None
+            property_dict["latlon_max"] = None
+
+        try:
+            geometry = features["geometry"]
+            # list lat lon
+            latlon = list(map(lambda v:float(v),geometry.get("coordinates")))[::-1]
+            latlon = list(map(lambda c:round(c,5),latlon))
+            property_dict["latlon"]  = latlon
+            latlon = property_dict["latlon"]
+            property_dict["url_geohack"] = Geo.URL_GEOHACK+Geo.latlon2geohack(latlon)
+            property_dict["url_osm"] = Geo.latlon2osm(latlon)
+            # skalar
+            property_dict["geometry_type"] = geometry.get("type")
+        except:
+            print("No Geometry Found in OSM Data")
+            property_dict["latlon"] = None
+            property_dict["geometry_type"] = None
+        
+        # additional parameter from url request
+        property_dict["url_nominatim"] = geo_json.get("url_nominatim")
+        property_dict["http_status"] = geo_json.get("http_status")
+
+        return property_dict
+    
+    @staticmethod
+    def read_locinfo_from_nominatim(latlon,zoom=18,addressdetails=18)->dict:
+        """ Executes reverse search on nominatim geoserver, returns result als flattened dict 
+            specification https://nominatim.org/release-docs/latest/api/Reverse/
+            'https://nominatim.openstreetmap.org/reverse?format=geojson&lat=48.7791304&lon=9.186206&zoom=18&addressdetails=18'
+        """
+        return None
