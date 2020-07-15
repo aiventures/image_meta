@@ -6,6 +6,7 @@ import traceback
 from xml.dom import minidom
 import pytz
 import shutil
+from xml.dom import minidom
 from datetime import datetime
 from pathlib import Path
 from image_meta import util
@@ -96,7 +97,7 @@ class Persistence:
                     </trkpt> 
                 ...           
         """    
-        from xml.dom import minidom
+        
         try:
             gpsx_xml =  minidom.parse(gpsx_path)
         except:
@@ -156,11 +157,12 @@ class Persistence:
             return None
         
         try:
-            with open(filepath) as json_file:
+            with open(filepath,encoding='utf-8') as json_file:
                     data = json.load(json_file)                    
         except:
-            print(f"Error opening {filepath}")
+            print(f"**** Error opening {filepath} ****")
             print(traceback.format_exc())
+            print("***************")
             
         return data
 
@@ -170,7 +172,7 @@ class Persistence:
         
         with open(filepath, 'w', encoding='utf-8') as json_file:
             try:
-                json.dump(data, json_file, ensure_ascii=False)
+                json.dump(data, json_file, indent=4,ensure_ascii=False)
             except:
                 print(f"Exception writing file {filepath}")
                 print(traceback.format_exc())
