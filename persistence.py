@@ -220,6 +220,14 @@ class Persistence:
         return path_save+filename+timestamp+file_end
 
     @staticmethod
+    def replace_file_suffix(filepath:str,suffix:str):
+        """replaces file suffix"""
+        p = Path(filepath)
+        old_suffix = "".join(p.suffixes)
+        l = len(old_suffix)
+        return os.path.normpath(str(p)[:-l]+"."+suffix)
+
+    @staticmethod
     def save_file(data,filename,path=None,file_extension=None,append_timestamp=False,append_data=False,encoding='utf-8'):
         """ saves data as string to file, optional with appended timestamp, returns path  
             if file already exists and append is set to true, data will be appended
