@@ -14,7 +14,7 @@ class Geo:
 
     RADIUS_EARTH = 6371 #Earth Radius in kilometers 
 
-    URL_GEOHACK = "https://geohack.toolforge.org/geohack.php?params="
+    GEOHACK_URL = "https://geohack.toolforge.org/geohack.php?params="
     NOMINATIM_REVERSE_URL    = "https://nominatim.openstreetmap.org/reverse"
     NOMINATIM_REVERSE_PARAMS = {'format':'geojson','lat':'0','lon':'0',
                                 'zoom':'18','addressdetails':'18','accept-language':'de'}
@@ -91,6 +91,7 @@ class Geo:
     @staticmethod
     def latlon2geohack(latlon):
         """ converts latlon to decimals in geohack format """
+        latlon = list(map(lambda n:(round(n,5)),latlon))
         lat,lon = latlon
         lat_ref = "N"
         lon_ref = "E"
@@ -98,12 +99,8 @@ class Geo:
             lat_ref = "S"
         if lon < 0:
             lon_ref = "W"
-        lat_geo = list(map(lambda n:str(n),Geo.dec2geo(abs(lat))))
-        lat_geo.append(lat_ref)
-        lon_geo = list(map(lambda n:str(n),Geo.dec2geo(abs(lon))))
-        lon_geo.append(lon_ref)
-        latlon_geo = [*lat_geo,*lon_geo]
-        return "_".join(latlon_geo)
+        coord_s = "_".join([str(abs(lat)),lat_ref,str(abs(lon)),lon_ref])
+        return coord_s
     
     @staticmethod
     def geohack2dec(geohack:str):
@@ -149,6 +146,12 @@ class Geo:
             return trg_dict
 
         property_dict = {}  
+
+        # additional parameter from url request
+        property_dict["nominatim_url"] = geo_json.get("nominatim_url")
+        property_dict["http_status"] = geo_json.get("http_status")
+        addressdetails = geo_json.get("addressdetails",18)
+        property_dict["addressdetails"] = addressdetails
 
         err = geo_json.get("error",None)
         if err is not None:
@@ -199,7 +202,7 @@ class Geo:
             property_dict["latlon_min"] = latlon_min 
             property_dict["latlon_max"] = latlon_max
             # calculate distance in m
-            property_dict["distance"] = round(Geo.get_distance(latlon_min,latlon_max)*1000)
+            property_dict["distance_m"] = round(Geo.get_distance(latlon_min,latlon_max)*1000)
         except:
             property_dict["latlon_min"] = None
             property_dict["latlon_max"] = None
@@ -211,8 +214,8 @@ class Geo:
             latlon = list(map(lambda c:round(c,5),latlon))
             property_dict["latlon"]  = latlon
             latlon = property_dict["latlon"]
-            property_dict["url_geohack"] = Geo.URL_GEOHACK+Geo.latlon2geohack(latlon)
-            property_dict["url_osm"] = Geo.latlon2osm(latlon)
+            property_dict["url_geohack"] = Geo.GEOHACK_URL+Geo.latlon2geohack(latlon)
+            property_dict["url_osm"] = Geo.latlon2osm(latlon,detail=addressdetails)
             # skalar
             property_dict["geometry_type"] = geometry.get("type")
         except:
@@ -220,16 +223,35 @@ class Geo:
             property_dict["latlon"] = None
             property_dict["geometry_type"] = None
         
-        # additional parameter from url request
-        property_dict["url_nominatim"] = geo_json.get("url_nominatim")
-        property_dict["http_status"] = geo_json.get("http_status")
-
+        if debug is True:
+            print(f"----Geo Dictionary----")
+            for k,v in property_dict.items():
+                print(f"\t{k} -> {str(v)} ")
+        
         return property_dict
     
     @staticmethod
-    def read_locinfo_from_nominatim(latlon,zoom=18,addressdetails=18)->dict:
+    def geo_reverse_from_nominatim(latlon,zoom=18,addressdetails=18,debug=False)->dict:
         """ Executes reverse search on nominatim geoserver, returns result als flattened dict 
             specification https://nominatim.org/release-docs/latest/api/Reverse/
             'https://nominatim.openstreetmap.org/reverse?format=geojson&lat=48.7791304&lon=9.186206&zoom=18&addressdetails=18'
         """
-        return None
+
+        url = Geo.NOMINATIM_REVERSE_URL
+        params = Geo.NOMINATIM_REVERSE_PARAMS.copy()
+        params["lat"] = str(latlon[0])
+        params["lon"] = str(latlon[1])
+        params["addressdetails"] = str(addressdetails)
+        zoom = str(zoom)
+        params["zoom"] = zoom
+        response = requests.get(url,params)
+
+        geo_json = response.json()
+
+        geo_json["nominatim_url"] = response.url
+        geo_json["http_status"] = response.status_code
+        geo_json["addressdetails"] = zoom
+
+        geo_dict = Geo.nominatimreverse2dict(geo_json,debug=debug) 
+
+        return geo_dict
