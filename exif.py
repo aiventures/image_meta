@@ -185,7 +185,7 @@ class ExifTool(object):
             output += os.read(fd, 4096).decode('utf-8')
         return output[:-len(ExifTool.SENTINEL)]
 
-    def get_metadict_from_img(self,filenames,metafilter=None,filetypes=ExifTool.IMG_FILE_TYPES,list_metadata=META_DATA_LIST,charset="UTF8") -> dict:
+    def get_metadict_from_img(self,filenames,metafilter=None,filetypes=IMG_FILE_TYPES,list_metadata=META_DATA_LIST,charset="UTF8") -> dict:
         """ reads EXIF data in args format into dictionary, with the filter list only selected metadata will be read """
 
         meta_arg_dict = {}
