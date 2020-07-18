@@ -1,6 +1,7 @@
 """ module to handle overall execution of EXIF handling """
 
 import os
+import pytz
 from image_meta.persistence import Persistence
 from image_meta.util import Util
 from image_meta.geo import Geo
@@ -25,6 +26,7 @@ class Controller(object):
             return None
         tpl_dict["INFO_1"] = "template; Enter null w/o double quotes if you do not need respective parameter"    
         tpl_dict["INFO_2"] = "If no paths for file references are supplied work directory will be used to find data"    
+        tpl_dict["INFO_3"] = "USe double back slash '\\' or single slash '/' as path separators  ! "    
         tpl_dict["INFO_EXIFTOOL_FILE"] = "INFO: Enter full path to your EXIFTOOL.EXE executable"
         tpl_dict["EXIFTOOL_FILE"] ="exiftool.exe"
         tpl_dict["INFO_WORK_DIR"] = "INFO: Work Directory, If supplied only file names need to be supplied"
@@ -56,6 +58,9 @@ class Controller(object):
     
     @staticmethod
     def read_params_from_file(filepath=None,showinfo=True):
+
+        IGNORE = ["WORK_DIR","TIMEZONE"]
+
         """ reads control parameters from file """
         control_params = {}
         
@@ -68,14 +73,35 @@ class Controller(object):
         work_dir = params_raw.get("WORK_DIR")
         if work_dir is not None:
             if not os.path.isdir(work_dir):
-                print(f"workdir {work_dir} is not a valid path")
-                work_dir = None
+                print(f"Work Dir {work_dir} is not a valid path")
+                work_dir = ""
+        
+        timezone = params_raw.get("TIMEZONE","Europe/Berlin")
 
-        #print(params_raw)
+        if showinfo is True:
+            print(f"WORKING DIRECTORY -> {work_dir}")
+            print(f"TIME ZONE -> {timezone}")
+
         for k,v in params_raw.items():
-            if ( "INFO_" in k ) or ( k == "WORK_DIR" ):
+            
+            if ( "INFO_" in k ) or ( k.upper() in IGNORE ):
                 continue 
-            print(f"{k} -> {v}")
+       
+            print(f"PARAMETER {k} -> {v}")
+            
+            # convert datetime fields
+            if "DATETIME" in k.upper():
+                dt_loc = Util.get_datetime_from_string(datetime_s=v,local_tz=timezone,debug=showinfo)
+            
+            if k == "DEFAULT_LATLON":
+                latlon = [float(v[0]),float(v[1])]
+                print(latlon)
+            
+            #convert to full path
+            if "FILE" in k.upper():
+                full_path = Persistence.get_file_full_path(path=work_dir,filename=v)
+                if showinfo:
+                    print(f"   File Parameter {k} points to {full_path}")
 
         return None
 
