@@ -8,16 +8,15 @@ class Util:
     """ util module """
 
     @staticmethod
-    def get_timestamp(datetime_s:str,local_tz='Europe/Berlin',debug=False) -> int:
-        """ returns UTC timestamp for date string 
+    def get_datetime_from_string(datetime_s:str,local_tz='Europe/Berlin',debug=False) -> str:
+        """ returns datetime for date string with timezone 
             allowed formats:  ####:##:## ##:##:##  (datetime localized with local_tz) 
                               ####-##-##T##:##:##Z  (UTC) 
                               ####-##-##T##:##:##.000Z
                               ####-##-##T##:##:##(+/-)##:## (UTC TIme Zone Offsets)
                             
             (<year>-<month>-<day>T<hour>-<minute>(T/<+/-time offset)    
-        """
-        
+        """    
         dt = None
 
         if debug is True:
@@ -28,12 +27,14 @@ class Util:
 
         reg_expr_utc2 = "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}[.]000Z$"
         reg_expr_tz = "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}[+-]\\d{2}:\\d{2}$"
-
+        
         if ( ( len(re.findall(reg_expr_dt, datetime_s)) == 1 ) ): # date time format
             try:
                 timezone_loc = pytz.timezone(local_tz)
                 dt_s = datetime_s[0:4]+"-"+datetime_s[5:7]+"-"+datetime_s[8:10]+" "+datetime_s[11:13]+"-"+datetime_s[14:16]+"-"+datetime_s[17:19]
-                dt = datetime.strptime(dt_s,"%Y-%m-%d %H-%M-%S").astimezone(timezone_loc)
+                #dt = datetime.strptime(dt_s,"%Y-%m-%d %H-%M-%S").replace(tzinfo=timezone_loc)
+                dt = datetime.strptime(dt_s,"%Y-%m-%d %H-%M-%S")
+                dt = timezone_loc.localize(dt)
             except:
                 return 0
 
@@ -53,12 +54,23 @@ class Util:
                 dt_s = datetime_s[:-3]+datetime_s[-2:]
                 dt = datetime.strptime(dt_s, "%Y-%m-%dT%H:%M:%S%z")
             except:
-                return 0
+                return None
         
         if debug is True:
-            print(f"IN:{datetime_s_in}, dt:{dt}, tz:{dt.tzinfo} utc:{dt.utcoffset()}, dst:{dt.tzinfo.dst(dt)}")            
+            print(f"IN:{datetime_s_in}, dt:{dt}, tz:{dt.tzinfo} utc:{dt.utcoffset()}, dst:{dt.tzinfo.dst(dt)}")    
 
+        return dt              
+
+
+    @staticmethod
+    def get_timestamp(datetime_s:str,local_tz='Europe/Berlin',debug=False) -> int:
+        """ returns UTC timestamp for date string  
+        """
+
+        dt = Util.get_datetime_from_string(datetime_s,local_tz,debug)
         ts = int(dt.timestamp())
+        if debug is True:
+            print(f"Datestring: {datetime_s} Timezone {local_tz} Timestamp: {ts}")
         
         return ts
 
