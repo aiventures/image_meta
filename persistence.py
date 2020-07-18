@@ -6,6 +6,7 @@ import traceback
 from xml.dom import minidom
 import pytz
 import shutil
+import re
 from xml.dom import minidom
 from datetime import datetime
 from pathlib import Path
@@ -14,7 +15,11 @@ from image_meta.util import Util
 
 class Persistence:
     """ read/write data into persistence (right now, only json)"""
+    
     PATH_SEPARATOR = os.sep
+
+    # regex pattern for a raw file name: 3 letters 5 decimals
+    REGEX_RAW_FILE_NAME = r"[a-zA-Z]{3}\d{5}"
 
     debug = False
 
@@ -257,15 +262,80 @@ class Persistence:
         return s        
     
     @staticmethod
-    def copy_files(src_path,trg_path,ext=""):
+    def filter_files(path,ext=None):
+        """ filters out files from a given directory
+            ext is a string or a list of extension to be filtered
+            returns list of full path file names
+        """
+
+        if ext is not None:
+            if isinstance(ext,str):
+                ext_filter = [ext]
+            elif isinstance(ext,list):
+                ext_filter = ext
+            ext_filter = list(map(lambda s:("."+s.lower()),ext_filter))
+        else:
+            ext_filter = None
+        
+        file_list = listdir(path)
+        
+        # filter extensions
+        if ext_filter is None:
+            copy_list = file_list
+        else:
+            copy_list = list([f for f in file_list if Path(f).suffix.lower() in ext_filter ])
+            # special case: no suffix
+            if ("" in ext):
+                copy_list_empty = list([f for f in file_list if Path(f).suffix == ""])
+                copy_list.extend(copy_list_empty)
+
+        # only copy files
+        copy_list = list(filter(lambda f:os.path.isfile(os.path.join(path,f)),copy_list))        
+
+        return copy_list
+
+    @staticmethod
+    def copy_files(src_path,trg_path,ext=None):
         """copies files from one file path to another
            filter ext can be supplied to only copy certain file types
            returns list of copied files in target directory"""
         
-        file_list = listdir(src_path)
+        copy_list = Persistence.filter_files(path=src_path,ext=ext)
+
         copied_files = [shutil.copy(os.path.join(src_path,f),os.path.join(trg_path,f)) 
-                        for f in file_list if f.endswith(ext)]
+                        for f in copy_list]
+
         return copied_files
+    
+    @staticmethod
+    def rename_raw_img_files(path,ext=None,debug=False,simulate=False):
+        """ renames raw image files (3 letters 5 decimals) by replacing the 3 letters by folder name"""
+        regex = re.compile(Persistence.REGEX_RAW_FILE_NAME, re.IGNORECASE)
+        p = Path(path)
 
+        try:
+            parent_dir = (Path(path).parts[-1])
+        except:
+            parent_dir = ""
+        if debug is True:
+            print(f"Parent Directory {parent_dir}")
+        file_list = Persistence.filter_files(path,ext) 
+        for src_file_name in file_list:
+            r = re.search(regex,src_file_name)
+            if r is not None:
+                trg_file_name = regex.sub("".join([parent_dir,"_",r.group()[3:]]),src_file_name)
+                src = os.path.join(p,src_file_name)
+                trg = os.path.join(p,trg_file_name)
+                if debug is True:
 
-     
+                    print(f"rename {src_file_name} -> {trg_file_name}" )
+
+                if os.path.isfile(trg):
+                    print(f"Rename {src_file_name}: File {trg} already exists and can't be renamed!")
+                else:
+                    if simulate is False:
+                        os.rename(src,trg)
+            else:
+                if debug is True:
+                    print(f"File {src_file_name} will be ignored (doesn't match {regex})")
+
