@@ -338,4 +338,25 @@ class Persistence:
             else:
                 if debug is True:
                     print(f"File {src_file_name} will be ignored (doesn't match {regex})")
-
+    
+    @staticmethod
+    def get_file_full_path(path:str="",filename:str="",check=True):
+        """ checks for existence whether filename or combination of path and filename points to an existing file
+            if check flag is set, otherwise it will return just a path """
+        
+        file_path = str(Path(os.path.normpath(os.path.join(path,filename))))
+        
+        if not check:
+            return file_path
+        
+        if os.path.isfile(filename):
+            file_path = str(Path(os.path.normpath(filename)))
+        elif os.path.isfile(path):
+            file_path = str(Path(os.path.normpath(path)))
+        elif os.path.isfile(file_path):
+            pass
+        else:
+            file_path = None
+        
+        return file_path
+            
