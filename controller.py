@@ -44,8 +44,10 @@ class Controller(object):
         # Keywords
         tpl_dict["INFO_KEYWORD_HIER_FILE"] = "INFO: UTF8 Text file containing your metadata keyword hierarchy"
         tpl_dict["KEYWORD_HIER_FILE"] = "_keyword_hier_file_"
-        tpl_dict["INFO_KEYWORD_FILE"] = "INFO: UTF8 Text file with default keywords, entry line needs to be in form keywords= ... "
-        tpl_dict["KEYWORD_FILE"] = "_keyword_file_"
+        tpl_dict["INFO_META_FILE"] = "INFO: UTF8 Text file with additonal meta data, each entry line needs to be in args format, eg '-keywords=...'"
+        tpl_dict["META_FILE"] = "_meta_file_"
+        tpl_dict["INFO_OVERWRITE_KEYWORD"] = "INFO: Overwrite Keywords / Hier Subject or append from meta file "
+        tpl_dict["OVERWRITE_KEYWORD"] = False
         
         # Geo Coordinate Handling
         tpl_dict["INFO_CALIB_IMG_FILE"] = "INFO: image displaying time of your GPS "
@@ -131,9 +133,12 @@ class Controller(object):
 
             #convert to full path
             if "FILE" in K:
-                full_path = Persistence.get_file_full_path(filepath=work_dir,filename=v,object_filter=[Persistence.OBJECT_FILE])                
+                object_filter=[Persistence.OBJECT_FILE]
+                if K == "DEFAULT_LATLON_FILE":
+                    object_filter = [Persistence.OBJECT_FILE,Persistence.OBJECT_NEW_FILE] 
+                full_path = Persistence.get_file_full_path(filepath=work_dir,filename=v,object_filter=object_filter,showinfo=False)                
                 if showinfo:
-                    print(f"   File Parameter {k} points to {full_path}")
+                    print(f"   File Parameter {k} points to {full_path} (filter {object_filter})")
                 control_params[K] = full_path
                 continue
 
