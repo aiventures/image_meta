@@ -17,6 +17,10 @@ class Persistence:
     """ read/write data into persistence (right now, only json)"""
     
     PATH_SEPARATOR = os.sep
+    OBJECT_FOLDER = "folder"
+    OBJECT_FILE = "file"
+    OBJECT_NEW_FOLDER = "new_folder"
+    OBJECT_NEW_FILE = "new_file"    
 
     # regex pattern for a raw file name: 3 letters 5 decimals
     REGEX_RAW_FILE_NAME = r"[a-zA-Z]{3}\d{5}"
@@ -340,23 +344,105 @@ class Persistence:
                     print(f"File {src_file_name} will be ignored (doesn't match {regex})")
     
     @staticmethod
-    def get_file_full_path(path:str="",filename:str="",check=True):
+    def get_file_full_path(filepath:str="",filename:str="",check=True,allow_new=True,showinfo=False
+                          ,object_filter=[OBJECT_NEW_FILE,OBJECT_FILE]):
         """ checks for existence whether filename or combination of path and filename points to an existing file
-            if check flag is set, otherwise it will return just a path """
+            if check flag is set, otherwise it will return just a path 
+            if allow_new is set, it will check whether a combination of path / file will lead to a valid file path
+            object_filter allows for returning only certain object types (folder/files, existing/new)
+            """
+
+        full_filepath = None
+
+        # check if path or file name alone are already file names
+        file_info_list = []
+
+        if (filepath != "" and filename != ""):
+            join_path = str(Path(os.path.normpath(os.path.join(filepath,filename))))
+            join_info =  Persistence.get_filepath_info(join_path)
+            full_filepath = join_info.get("filepath")
+            file_info_list.append(join_info)
         
-        file_path = str(Path(os.path.normpath(os.path.join(path,filename))))
-        
+        if filepath != "":
+            path_info = Persistence.get_filepath_info(filepath)
+            file_info_list.append(path_info)
+
+        if filename != "":
+            file_info = Persistence.get_filepath_info(filename)
+            file_info_list.append(file_info)
+
         if not check:
-            return file_path
+            # check for plausible results
+            return full_filepath
         
-        if os.path.isfile(filename):
-            file_path = str(Path(os.path.normpath(filename)))
-        elif os.path.isfile(path):
-            file_path = str(Path(os.path.normpath(path)))
-        elif os.path.isfile(file_path):
-            pass
+        full_filepath = None
+
+        # check if path or file name alone are already file name
+        for file_info in file_info_list:
+            filepath = file_info["filepath"]
+            file_object = file_info["object"]
+
+            if file_object in object_filter:
+                full_filepath = filepath
+
+            if showinfo:
+                print(f"Checking Filepath {filepath} returns type {file_object}")
+
+        return full_filepath
+    
+    @staticmethod    
+    def get_filepath_info(filepath,showinfo=False):
+        """ returns metainfo for a given file path 
+            Notabene: doesn't fully work in Desktop folders in Windows (folder info wrong) """
+        fileinfo = {}
+        fileinfo["filepath"] = os.path.normpath(filepath)
+        p = Path(filepath)
+        fileinfo["parts"] = list(p.parts)
+        fileinfo["parent"] = str(p.parent)
+        fileinfo["stem"] = p.stem
+        fileinfo["drive"] = p.drive
+        is_absolute_path = False
+        if len(p.drive) > 0:
+            is_absolute_path = True
+        fileinfo["is_absolute_path"] = is_absolute_path
+        fileinfo["suffix"] = p.suffix[1:]
+        fileinfo["is_dir"] = os.path.isdir(p)
+        fileinfo["is_file"] = os.path.isfile(p)
+        parent_is_dir = os.path.isdir(p.parent)
+
+        # only if path contains more than 1 element
+        if ( parent_is_dir and len(p.parts) <= 1 ):
+            parent_is_dir = False
+        fileinfo["parent_is_dir"] = parent_is_dir
+        
+        # exists
+        fileinfo["exists"] = False 
+        if ( fileinfo["is_dir"] or  fileinfo["is_file"] ):
+             fileinfo["exists"] = True
+        
+        # get existing parent if existing
+        if parent_is_dir:
+            fileinfo["existing_parent"] = fileinfo["parent"] 
         else:
-            file_path = None
+            fileinfo["existing_parent"] = None
         
-        return file_path
+        fileinfo["object"]  = None
+        if fileinfo["is_dir"]:
+            fileinfo["object"]  = Persistence.OBJECT_FOLDER
+        
+        if fileinfo["is_file"]:
+            fileinfo["object"]  = Persistence.OBJECT_FILE
+
+        # create potentially new folder name / file name
+        if ( fileinfo["existing_parent"] is not None and fileinfo["object"] is None):
+            if fileinfo["suffix"] == '':
+                fileinfo["object"]  = Persistence.OBJECT_NEW_FOLDER
+            else:
+                fileinfo["object"]  = Persistence.OBJECT_NEW_FILE
+
+        if showinfo:
+            for k,v in fileinfo.items():
+                print(f"{k} -> {v}")
+            
+        return fileinfo
             
