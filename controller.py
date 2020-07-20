@@ -60,8 +60,8 @@ class Controller(object):
         tpl_dict["GPX_FILE"] = "geo.gpx"       
         tpl_dict["INFO_DEFAULT_LATLON"] = "DEFAULT LAT LON COORDINATES if Geocoordinates or GPX Data can't be found"
         tpl_dict["DEFAULT_LATLON"] = (49.01304,8.40433)  
-        tpl_dict["INFO_CREATE_LATLON"] = "Create LATLON FILE, values (0:do nothing,2:read only latlon,1:overwrite and create latlon file )"
-        tpl_dict["CREATE_LATLON"] = 1          
+        tpl_dict["INFO_CREATE_LATLON"] = "Create LATLON FILE, values (0:ignore, 1:read only, 3:overwrite/create)"
+        tpl_dict["CREATE_LATLON"] = 3       
         tpl_dict["INFO_DEFAULT_LATLON_FILE"] = "DEFAULT LAT LON FILE PATH for Default Geocoordinates if they can't be found"
         tpl_dict["DEFAULT_LATLON_FILE"] = "default.gps"          
         tpl_dict["INFO_DEFAULT_MAP_DETAIL"] = "DEFAULT Detail level for map links (1...18)"
@@ -81,7 +81,7 @@ class Controller(object):
         """ reads control parameters from file and returns them
             as dictionary """
 
-        IGNORE = ["WORK_DIR","TIMEZONE"]
+        IGNORE = ["WORK_DIR","TIMEZONE","CREATE_LATLON"]
 
         """ reads control parameters from file """
         control_params = {}
@@ -103,9 +103,13 @@ class Controller(object):
         timezone = params_raw.get("TIMEZONE","Europe/Berlin")
         control_params["TIMEZONE"] = timezone
 
+        create_latlon = params_raw.get("CREATE_LATLON",Persistence.MODE_READ)
+        control_params["CREATE_LATLON"] = create_latlon
+
         if showinfo is True:
             print(f"WORKING DIRECTORY -> {work_dir}")
             print(f"TIME ZONE -> {timezone}")
+            print(f"CREATE LATLON DEFAULT FILE -> {create_latlon} ({Persistence.MODE_TXT[create_latlon]})")
 
         for k,v in params_raw.items():
 
@@ -135,8 +139,14 @@ class Controller(object):
             if "FILE" in K:
                 object_filter=[Persistence.OBJECT_FILE]
                 if K == "DEFAULT_LATLON_FILE":
-                    object_filter = [Persistence.OBJECT_FILE,Persistence.OBJECT_NEW_FILE] 
-                full_path = Persistence.get_file_full_path(filepath=work_dir,filename=v,object_filter=object_filter,showinfo=False)                
+                    # read is default 
+                    object_filter = [Persistence.OBJECT_FILE] 
+
+                    if create_latlon == Persistence.MODE_IGNORE:
+                        object_filter = [] 
+                    elif create_latlon == Persistence.MODE_CREATE:
+                        object_filter = [Persistence.OBJECT_FILE,Persistence.OBJECT_NEW_FILE]                         
+                full_path = Persistence.get_file_full_path(filepath=work_dir,filename=v,object_filter=object_filter,showinfo=False)            
                 if showinfo:
                     print(f"   File Parameter {k} points to {full_path} (filter {object_filter})")
                 control_params[K] = full_path
