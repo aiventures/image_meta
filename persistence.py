@@ -23,12 +23,12 @@ class Persistence:
     OBJECT_NEW_FILE = "new_file"    
 
     # file operations
-    MODE_IGNORE = 0
-    MODE_READ =  1
-    MODE_UPDATE = 2
-    MODE_CREATE = 3
-    MODE_DELETE = 4 
-    MODE_TXT = { 0:"MODE IGNORE", 1:"MODE READ",2:"MODE UPDATE",3:"MODE CREATE",4:"MODE DELETE"}
+    MODE_IGNORE = "0"
+    MODE_READ =  "R"
+    MODE_UPDATE = "U"
+    MODE_CREATE = "C"
+    MODE_DELETE = "D"
+    MODE_TXT = { "0":"MODE IGNORE", "R":"MODE READ","U":"MODE UPDATE","C":"MODE CREATE","D":"MODE DELETE"}
 
     # regex pattern for a raw file name: 3 letters 5 decimals
     REGEX_RAW_FILE_NAME = r"[a-zA-Z]{3}\d{5}"

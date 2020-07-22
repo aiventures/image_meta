@@ -31,10 +31,12 @@ class Controller(object):
     TEMPLATE_CALIB_DATETIME = "CALIB_DATETIME"
     TEMPLATE_CALIB_OFFSET = "CALIB_OFFSET"
     TEMPLATE_GPX = "GPX"
-    TEMPLATE_LATLON_DEFAULT = "LATLON_DEFAULT"
+    TEMPLATE_DEFAULT_LATLON = "DEFAULT_LATLON"
+    TEMPLATE_CREATE_LATLON = "CREATE_LATLON"    
     TEMPLATE_DEFAULT_MAP_DETAIL = "DEFAULT_MAP_DETAIL"
+    TEMPLATE_DEFAULT_REVERSE_GEO = "DEFAULT_REVERSE_GEO"
     TEMPLATE_PARAMS = [TEMPLATE_WORK_DIR,TEMPLATE_EXIFTOOL, TEMPLATE_META, TEMPLATE_OVERWRITE_KEYWORD, TEMPLATE_KEYWORD_HIER, TEMPLATE_TIMEZONE,
-                       TEMPLATE_CALIB_IMG, TEMPLATE_CALIB_DATETIME,TEMPLATE_GPX, TEMPLATE_LATLON_DEFAULT,TEMPLATE_DEFAULT_MAP_DETAIL]
+                       TEMPLATE_CALIB_IMG, TEMPLATE_CALIB_DATETIME,TEMPLATE_GPX, TEMPLATE_DEFAULT_LATLON,TEMPLATE_CREATE_LATLON,TEMPLATE_DEFAULT_MAP_DETAIL]
 
     @staticmethod
     def create_param_template(filepath="",name="",showinfo=True):
@@ -83,8 +85,8 @@ class Controller(object):
         tpl_dict["GPX_FILE"] = "geo.gpx"       
         tpl_dict["INFO_DEFAULT_LATLON"] = "DEFAULT LAT LON COORDINATES if Geocoordinates or GPX Data can't be found"
         tpl_dict["DEFAULT_LATLON"] = (49.01304,8.40433)  
-        tpl_dict["INFO_CREATE_LATLON"] = "Create LATLON FILE, values (0:ignore, 1:read only, 3:overwrite/create)"
-        tpl_dict["CREATE_LATLON"] = 3       
+        tpl_dict["INFO_CREATE_LATLON"] = "Create LATLON FILE, values (0:ignore, C:create, R:read , U:update"
+        tpl_dict["CREATE_LATLON"] = Persistence.MODE_CREATE     
         tpl_dict["INFO_DEFAULT_LATLON_FILE"] = "DEFAULT LAT LON FILE PATH for Default Geocoordinates if they can't be found"
         tpl_dict["DEFAULT_LATLON_FILE"] = "default.gps"          
         tpl_dict["INFO_DEFAULT_MAP_DETAIL"] = "DEFAULT Detail level for map links (1...18)"
@@ -161,8 +163,10 @@ class Controller(object):
 
             #convert to full path
             if "FILE" in K:
+
                 object_filter_list=[Persistence.OBJECT_FILE]
                 if K == "DEFAULT_LATLON_FILE":
+
                     # read is default 
                     object_filter_list = [Persistence.OBJECT_FILE] 
 
@@ -173,7 +177,7 @@ class Controller(object):
                 
                 for object_filter in object_filter_list:
                     object_filter_s = [object_filter]     
-                    full_path = Persistence.get_file_full_path(filepath=work_dir,filename=v,object_filter=object_filter_s,showinfo=False)     
+                    full_path = Persistence.get_file_full_path(filepath=work_dir,filename=v,object_filter=object_filter_s,showinfo=False)    
                     if not full_path is None:
                         control_params[K] = full_path
                         key_file_info = K+"_OBJECT"
@@ -230,40 +234,11 @@ class Controller(object):
     def prepare_execution(template_dict:dict,showinfo=False):
         """ validates template and checks, which actions can be done (reading hierarchy,geodata, exiftool,...) """
 
-        # Possible Keys
-        # ['WORK_DIR', 'TIMEZONE', 'CREATE_LATLON', 'CREATE_LATLON_TEXT', 'EXIFTOOL_FILE', 'EXIFTOOL_FILE_OBJECT', 'KEYWORD_HIER_FILE', 
-        # 'KEYWORD_HIER_FILE_OBJECT', 'KEYWORD_FILE', 'KEYWORD_FILE_OBJECT', 'OVERWRITE_KEYWORD', 'CALIB_IMG_FILE', 'CALIB_IMG_FILE_OBJECT', 
-        # 'CALIB_DATETIME', 'GPX_FILE', 'GPX_FILE_OBJECT', 'DEFAULT_LATLON', 'DEFAULT_LATLON_FILE', 'DEFAULT_LATLON_FILE_OBJECT', 'DEFAULT_MAP_DETAIL']
-
-    # TEMPLATE_WORK_DIR = "WORK_DIR"
-    # TEMPLATE_EXIFTOOL = "EXIFTOOL"
-    # TEMPLATE_KEYWORD = "KEYWORD"
-    # TEMPLATE_KEYWORD_HIER = "KEYWORD_HIER"
-    # TEMPLATE_DATETIME_OFFSET = "DATETIME_OFFSET"
-    # TEMPLATE_GPX = "GPX"
-    # TEMPLATE_LATLON_DEFAULT = "LATLON_DEFAULT"
-    # TEMPLATE_DEFAULT_MAP_DETAIL = "DEFAULT_MAP_DETAIL"
-
-        # TEMPLATE_PARAMS = [TEMPLATE_WORK_DIR,TEMPLATE_EXIFTOOL, TEMPLATE_KEYWORD, TEMPLATE_KEYWORD_HIER, 
-        #                    TEMPLATE_DATETIME_OFFSET, TEMPLATE_GPX, TEMPLATE_LATLON_DEFAULT,TEMPLATE_DEFAULT_MAP_DETAIL]
-
         def param_has_fileref(param):
             key = param + "_FILE_OBJECT"
-            return ( template_dict.get(key,None) == Persistence.OBJECT_FILE ) 
+            return ( ( template_dict.get(key,None) == Persistence.OBJECT_FILE ) or
+                     ( template_dict.get(key,None) == Persistence.OBJECT_NEW_FILE ) )
         
-
-
-    # TEMPLATE_EXIF = "EXIFTOOL"
-    # TEMPLATE_KEYWORDS = "KEYWORDS"
-    # TEMPLATE_HIER_KEYWORDS = "KEYWORD_HIER"
-    # TEMPLATE_DATETIME_OFFSET = "DATETIME_OFFSET"
-    # TEMPLATE_GPX_DATA = "GPX_DATA"
-    # TEMPLATE_LATLON_DEFAULT = "LATLON_DEFAULT"
-    # OBJECT_FOLDER = "folder"
-    # OBJECT_FILE = "file"
-    # OBJECT_NEW_FOLDER = "new_folder"
-    # OBJECT_NEW_FILE = "new_file"  
-    #  
         input_dict = {}
 
         # get exiftool availability
@@ -311,7 +286,8 @@ class Controller(object):
         # TEMPLATE_SINGLE_PARAMS = [TEMPLATE_OVERWRITE_KEYWORD,TEMPLATE_TIMEZONE,TEMPLATE_DEFAULT_MAP_DETAIL]
         input_dict[Controller.TEMPLATE_OVERWRITE_KEYWORD]  = template_dict.get(Controller.TEMPLATE_OVERWRITE_KEYWORD,False)
         input_dict[Controller.TEMPLATE_TIMEZONE]  = template_dict.get(Controller.TEMPLATE_TIMEZONE,"Europe/Berlin")
-        input_dict[Controller.TEMPLATE_DEFAULT_MAP_DETAIL]  = template_dict.get(Controller.TEMPLATE_DEFAULT_MAP_DETAIL,18)
+        map_detail = template_dict.get(Controller.TEMPLATE_DEFAULT_MAP_DETAIL,18)
+        input_dict[Controller.TEMPLATE_DEFAULT_MAP_DETAIL]  = map_detail
 
         # calibration image file and date, calculate offset
         if param_has_fileref(Controller.TEMPLATE_CALIB_IMG): 
@@ -340,14 +316,41 @@ class Controller(object):
                     input_dict[Controller.TEMPLATE_CALIB_IMG]  = None
                     input_dict[Controller.TEMPLATE_CALIB_DATETIME]  = None
                     input_dict[Controller.TEMPLATE_CALIB_OFFSET] = 0
-
-
-
+        
+                
+        # read / create default latlon file and get default reverse data
+        default_lat_lon = template_dict.get(Controller.TEMPLATE_DEFAULT_LATLON,None)
+        
+        if default_lat_lon is not None:
+            create_lat_lon =  template_dict.get(Controller.TEMPLATE_CREATE_LATLON,Persistence.MODE_READ)
+            input_dict[Controller.TEMPLATE_DEFAULT_LATLON]  = default_lat_lon
+            input_dict[Controller.TEMPLATE_CREATE_LATLON]  = create_lat_lon
             
 
+            if param_has_fileref(Controller.TEMPLATE_DEFAULT_LATLON):
+                k = Controller.TEMPLATE_DEFAULT_LATLON+"_FILE"
+                f = template_dict.get(k)
+                input_dict[k] = f 
+                ko = Controller.TEMPLATE_DEFAULT_LATLON+"_FILE_OBJECT"
+                fo = template_dict.get(ko)
+                input_dict[ko] = fo 
+                
+                remote = False
+                save = False
+                
+                # create /update: get latlon from service, save 
+                if ( ( fo == Persistence.OBJECT_NEW_FILE and create_lat_lon == Persistence.MODE_CREATE ) or
+                   ( fo == Persistence.OBJECT_FILE and create_lat_lon in "CU" ) ):
+                    remote = True
+                    save = True
+                
+                # retrieve the nominatim data either from local file or from service
+                if create_lat_lon in "CRU":
+                    input_dict[Controller.TEMPLATE_DEFAULT_REVERSE_GEO] = Controller.retrieve_nominatim_reverse(filepath=f,
+                                                                            latlon=default_lat_lon,save=save,
+                                                                            zoom=map_detail,remote=remote,debug=False)         
 
         # get gpx file
-        # read default latlon file
-        # create default lat lon file id not present and mode will create it
+
 
         return input_dict        
