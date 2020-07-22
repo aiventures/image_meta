@@ -32,7 +32,6 @@ class Util:
             try:
                 timezone_loc = pytz.timezone(local_tz)
                 dt_s = datetime_s[0:4]+"-"+datetime_s[5:7]+"-"+datetime_s[8:10]+" "+datetime_s[11:13]+"-"+datetime_s[14:16]+"-"+datetime_s[17:19]
-                #dt = datetime.strptime(dt_s,"%Y-%m-%d %H-%M-%S").replace(tzinfo=timezone_loc)
                 dt = datetime.strptime(dt_s,"%Y-%m-%d %H-%M-%S")
                 dt = timezone_loc.localize(dt)
             except:

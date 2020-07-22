@@ -9,9 +9,32 @@ from image_meta.exif import ExifTool
 from pathlib import Path
 from datetime import datetime
 
-
-
 class Controller(object):
+
+        # checks which items have existing file references
+        # get exiftool availability 
+        # get additional keyword file
+        # get hierarchical keywords
+        # calibration image file and date, calculate offset
+        # get gpx file
+        # read default latlon file
+        # create default lat lon file id not present and mode will create it
+
+    # input parameters for exif
+    TEMPLATE_WORK_DIR = "WORK_DIR"
+    TEMPLATE_EXIFTOOL = "EXIFTOOL"
+    TEMPLATE_META = "META"
+    TEMPLATE_OVERWRITE_KEYWORD = "OVERWRITE_KEYWORD"
+    TEMPLATE_KEYWORD_HIER = "KEYWORD_HIER"
+    TEMPLATE_TIMEZONE = "TIMEZONE"
+    TEMPLATE_CALIB_IMG = "CALIB_IMG"
+    TEMPLATE_CALIB_DATETIME = "CALIB_DATETIME"
+    TEMPLATE_CALIB_OFFSET = "CALIB_OFFSET"
+    TEMPLATE_GPX = "GPX"
+    TEMPLATE_LATLON_DEFAULT = "LATLON_DEFAULT"
+    TEMPLATE_DEFAULT_MAP_DETAIL = "DEFAULT_MAP_DETAIL"
+    TEMPLATE_PARAMS = [TEMPLATE_WORK_DIR,TEMPLATE_EXIFTOOL, TEMPLATE_META, TEMPLATE_OVERWRITE_KEYWORD, TEMPLATE_KEYWORD_HIER, TEMPLATE_TIMEZONE,
+                       TEMPLATE_CALIB_IMG, TEMPLATE_CALIB_DATETIME,TEMPLATE_GPX, TEMPLATE_LATLON_DEFAULT,TEMPLATE_DEFAULT_MAP_DETAIL]
 
     @staticmethod
     def create_param_template(filepath="",name="",showinfo=True):
@@ -33,15 +56,15 @@ class Controller(object):
         tpl_dict["INFO_2"] = "If no paths for file references are supplied work directory will be used to find data"    
         tpl_dict["INFO_3"] = "USe double back slash '\\' or single slash '/' as path separators  ! " 
         
-        # Reference to Exif Tool
+        # Reference to Exif Tool / TEMPLATE_EXIF
         tpl_dict["INFO_EXIFTOOL_FILE"] = "INFO: Enter full path to your EXIFTOOL.EXE executable"
         tpl_dict["EXIFTOOL_FILE"] ="exiftool.exe"
         
-        # Work Directory
+        # Work Directory / TEMPLATE_WORK_DIR
         tpl_dict["INFO_WORK_DIR"] = "INFO: Work Directory, If supplied only file names need to be supplied"
         tpl_dict["WORK_DIR"] = "_workdir_"
         
-        # Keywords
+        # Keywords / KEYWORD KEYWORD_HIER
         tpl_dict["INFO_KEYWORD_HIER_FILE"] = "INFO: UTF8 Text file containing your metadata keyword hierarchy"
         tpl_dict["KEYWORD_HIER_FILE"] = "_keyword_hier_file_"
         tpl_dict["INFO_META_FILE"] = "INFO: UTF8 Text file with additonal meta data, each entry line needs to be in args format, eg '-keywords=...'"
@@ -49,7 +72,7 @@ class Controller(object):
         tpl_dict["INFO_OVERWRITE_KEYWORD"] = "INFO: Overwrite Keywords / Hier Subject or append from meta file "
         tpl_dict["OVERWRITE_KEYWORD"] = False
         
-        # Geo Coordinate Handling
+        # Geo Coordinate Handling / 
         tpl_dict["INFO_CALIB_IMG_FILE"] = "INFO: image displaying time of your GPS "
         tpl_dict["CALIB_IMG_FILE"] = "gps.jpg"
         tpl_dict["INFO_CALIB_DATETIME"] = "INFO: Enter Date Time displayed by your GPS image in Format with Quotes 'YYYY:MM:DD HH:MM:SS' "
@@ -105,6 +128,7 @@ class Controller(object):
 
         create_latlon = params_raw.get("CREATE_LATLON",Persistence.MODE_READ)
         control_params["CREATE_LATLON"] = create_latlon
+        control_params["CREATE_LATLON_TEXT"] = Persistence.MODE_TXT.get(create_latlon,"NA")
 
         if showinfo is True:
             print(f"WORKING DIRECTORY -> {work_dir}")
@@ -121,10 +145,10 @@ class Controller(object):
             if showinfo:
                 print(f"PARAMETER {K} -> {v}")
             
-            # convert datetime fields
+            # convert datetime fields / currently not used
             if "DATETIME" in K:
-                dt_loc = Util.get_datetime_from_string(datetime_s=v,local_tz=timezone,debug=showinfo)
-                control_params[K] = dt_loc
+                #dt_loc = Util.get_datetime_from_string(datetime_s=v,local_tz=timezone,debug=showinfo)
+                control_params[K] = v
                 continue
             
             if k == "DEFAULT_LATLON":
@@ -137,19 +161,26 @@ class Controller(object):
 
             #convert to full path
             if "FILE" in K:
-                object_filter=[Persistence.OBJECT_FILE]
+                object_filter_list=[Persistence.OBJECT_FILE]
                 if K == "DEFAULT_LATLON_FILE":
                     # read is default 
-                    object_filter = [Persistence.OBJECT_FILE] 
+                    object_filter_list = [Persistence.OBJECT_FILE] 
 
                     if create_latlon == Persistence.MODE_IGNORE:
-                        object_filter = [] 
+                        object_filter_list = [] 
                     elif create_latlon == Persistence.MODE_CREATE:
-                        object_filter = [Persistence.OBJECT_FILE,Persistence.OBJECT_NEW_FILE]                         
-                full_path = Persistence.get_file_full_path(filepath=work_dir,filename=v,object_filter=object_filter,showinfo=False)            
-                if showinfo:
-                    print(f"   File Parameter {k} points to {full_path} (filter {object_filter})")
-                control_params[K] = full_path
+                        object_filter_list = [Persistence.OBJECT_FILE,Persistence.OBJECT_NEW_FILE]      
+                
+                for object_filter in object_filter_list:
+                    object_filter_s = [object_filter]     
+                    full_path = Persistence.get_file_full_path(filepath=work_dir,filename=v,object_filter=object_filter_s,showinfo=False)     
+                    if not full_path is None:
+                        control_params[K] = full_path
+                        key_file_info = K+"_OBJECT"
+                        control_params[key_file_info] = object_filter_s[0]
+                        if showinfo:
+                            print(f"   File Parameter {k} points to {full_path} (object {object_filter_s})")
+                    
                 continue
 
             #read other control parameters
@@ -194,3 +225,129 @@ class Controller(object):
                 print(f"Error writing data to file {filepath}")
         
         return geo_dict
+
+    @staticmethod
+    def prepare_execution(template_dict:dict,showinfo=False):
+        """ validates template and checks, which actions can be done (reading hierarchy,geodata, exiftool,...) """
+
+        # Possible Keys
+        # ['WORK_DIR', 'TIMEZONE', 'CREATE_LATLON', 'CREATE_LATLON_TEXT', 'EXIFTOOL_FILE', 'EXIFTOOL_FILE_OBJECT', 'KEYWORD_HIER_FILE', 
+        # 'KEYWORD_HIER_FILE_OBJECT', 'KEYWORD_FILE', 'KEYWORD_FILE_OBJECT', 'OVERWRITE_KEYWORD', 'CALIB_IMG_FILE', 'CALIB_IMG_FILE_OBJECT', 
+        # 'CALIB_DATETIME', 'GPX_FILE', 'GPX_FILE_OBJECT', 'DEFAULT_LATLON', 'DEFAULT_LATLON_FILE', 'DEFAULT_LATLON_FILE_OBJECT', 'DEFAULT_MAP_DETAIL']
+
+    # TEMPLATE_WORK_DIR = "WORK_DIR"
+    # TEMPLATE_EXIFTOOL = "EXIFTOOL"
+    # TEMPLATE_KEYWORD = "KEYWORD"
+    # TEMPLATE_KEYWORD_HIER = "KEYWORD_HIER"
+    # TEMPLATE_DATETIME_OFFSET = "DATETIME_OFFSET"
+    # TEMPLATE_GPX = "GPX"
+    # TEMPLATE_LATLON_DEFAULT = "LATLON_DEFAULT"
+    # TEMPLATE_DEFAULT_MAP_DETAIL = "DEFAULT_MAP_DETAIL"
+
+        # TEMPLATE_PARAMS = [TEMPLATE_WORK_DIR,TEMPLATE_EXIFTOOL, TEMPLATE_KEYWORD, TEMPLATE_KEYWORD_HIER, 
+        #                    TEMPLATE_DATETIME_OFFSET, TEMPLATE_GPX, TEMPLATE_LATLON_DEFAULT,TEMPLATE_DEFAULT_MAP_DETAIL]
+
+        def param_has_fileref(param):
+            key = param + "_FILE_OBJECT"
+            return ( template_dict.get(key,None) == Persistence.OBJECT_FILE ) 
+        
+
+
+    # TEMPLATE_EXIF = "EXIFTOOL"
+    # TEMPLATE_KEYWORDS = "KEYWORDS"
+    # TEMPLATE_HIER_KEYWORDS = "KEYWORD_HIER"
+    # TEMPLATE_DATETIME_OFFSET = "DATETIME_OFFSET"
+    # TEMPLATE_GPX_DATA = "GPX_DATA"
+    # TEMPLATE_LATLON_DEFAULT = "LATLON_DEFAULT"
+    # OBJECT_FOLDER = "folder"
+    # OBJECT_FILE = "file"
+    # OBJECT_NEW_FOLDER = "new_folder"
+    # OBJECT_NEW_FILE = "new_file"  
+    #  
+        input_dict = {}
+
+        # get exiftool availability
+        if param_has_fileref(Controller.TEMPLATE_EXIFTOOL):            
+            input_dict[Controller.TEMPLATE_EXIFTOOL] = template_dict[(Controller.TEMPLATE_EXIFTOOL+"_FILE")]
+            exiftool_ref = input_dict[Controller.TEMPLATE_EXIFTOOL]
+        else:
+            print("No Exiftool, preparation will be aborted")
+            return
+
+        # check working directory
+        work_dir = template_dict.get(Controller.TEMPLATE_WORK_DIR,"")
+        if work_dir == "":
+            print(f"{work_dir} is not a valid working directory check template")
+            return
+
+        input_dict[Controller.TEMPLATE_WORK_DIR] = work_dir
+
+        # read keyword hierarchy
+        keyword_hier = {}
+
+        if param_has_fileref(Controller.TEMPLATE_KEYWORD_HIER):
+            f = template_dict[(Controller.TEMPLATE_KEYWORD_HIER+"_FILE")]
+            try:
+                hier_raw = Persistence.read_file(f)
+                keyword_hier = ExifTool.create_metahierarchy_from_str(hier_raw)
+            except:
+                keyword_hier = {}
+        
+        input_dict[Controller.TEMPLATE_KEYWORD_HIER] = keyword_hier
+         
+        # get default metadata (keyword and others) from file
+        meta = {}
+        if param_has_fileref(Controller.TEMPLATE_META):
+            f = template_dict[(Controller.TEMPLATE_META+"_FILE")]
+            try:
+                meta_raw = Persistence.read_file(f)
+                meta = ExifTool.arg2dict(meta_raw)
+            except:
+                meta = {}
+
+        input_dict[Controller.TEMPLATE_META] = meta
+
+        # copy single template parameters with default values
+        # TEMPLATE_SINGLE_PARAMS = [TEMPLATE_OVERWRITE_KEYWORD,TEMPLATE_TIMEZONE,TEMPLATE_DEFAULT_MAP_DETAIL]
+        input_dict[Controller.TEMPLATE_OVERWRITE_KEYWORD]  = template_dict.get(Controller.TEMPLATE_OVERWRITE_KEYWORD,False)
+        input_dict[Controller.TEMPLATE_TIMEZONE]  = template_dict.get(Controller.TEMPLATE_TIMEZONE,"Europe/Berlin")
+        input_dict[Controller.TEMPLATE_DEFAULT_MAP_DETAIL]  = template_dict.get(Controller.TEMPLATE_DEFAULT_MAP_DETAIL,18)
+
+        # calibration image file and date, calculate offset
+        if param_has_fileref(Controller.TEMPLATE_CALIB_IMG): 
+            f = template_dict.get((Controller.TEMPLATE_CALIB_IMG+"_FILE"))
+            
+            # gps time (as stored in template file / read from image)
+            dt_gps_s = template_dict.get(Controller.TEMPLATE_CALIB_DATETIME)
+            if isinstance(dt_gps_s,str):
+                # get date time from image file
+                with ExifTool(exiftool_ref) as exif:
+                    meta_dict_list = exif.get_metadict_from_img(f)
+
+                try:
+                    # datetime of image
+                    dt_img_s = meta_dict_list[f]["CreateDate"]
+                    #time zone
+                    tz = input_dict[Controller.TEMPLATE_TIMEZONE]
+                    # datetime of image(cam) / gps time and offset
+                    dt_img = Util.get_datetime_from_string(datetime_s=dt_img_s,local_tz=tz,debug=False)
+                    dt_gps = Util.get_datetime_from_string(datetime_s=dt_gps_s,local_tz=tz,debug=False)
+                    time_offset = Util.get_time_offset(time_camera=dt_img_s,time_gps=dt_gps_s,debug=False)
+                    input_dict[Controller.TEMPLATE_CALIB_IMG]  = dt_img
+                    input_dict[Controller.TEMPLATE_CALIB_DATETIME]  = dt_gps
+                    input_dict[Controller.TEMPLATE_CALIB_OFFSET] = time_offset
+                except:
+                    input_dict[Controller.TEMPLATE_CALIB_IMG]  = None
+                    input_dict[Controller.TEMPLATE_CALIB_DATETIME]  = None
+                    input_dict[Controller.TEMPLATE_CALIB_OFFSET] = 0
+
+
+
+            
+
+
+        # get gpx file
+        # read default latlon file
+        # create default lat lon file id not present and mode will create it
+
+        return input_dict        
