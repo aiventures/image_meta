@@ -33,10 +33,12 @@ class Controller(object):
     TEMPLATE_GPX = "GPX"
     TEMPLATE_DEFAULT_LATLON = "DEFAULT_LATLON"
     TEMPLATE_CREATE_LATLON = "CREATE_LATLON"    
+    TEMPLATE_CREATE_DEFAULT_LATLON = "CREATE_DEFAULT_LATLON"  
     TEMPLATE_DEFAULT_MAP_DETAIL = "DEFAULT_MAP_DETAIL"
     TEMPLATE_DEFAULT_REVERSE_GEO = "DEFAULT_REVERSE_GEO"
     TEMPLATE_PARAMS = [TEMPLATE_WORK_DIR,TEMPLATE_EXIFTOOL, TEMPLATE_META, TEMPLATE_OVERWRITE_KEYWORD, TEMPLATE_KEYWORD_HIER, TEMPLATE_TIMEZONE,
-                       TEMPLATE_CALIB_IMG, TEMPLATE_CALIB_DATETIME,TEMPLATE_GPX, TEMPLATE_DEFAULT_LATLON,TEMPLATE_CREATE_LATLON,TEMPLATE_DEFAULT_MAP_DETAIL]
+                       TEMPLATE_CALIB_IMG, TEMPLATE_CALIB_DATETIME,TEMPLATE_GPX, TEMPLATE_DEFAULT_LATLON,TEMPLATE_CREATE_LATLON,
+                       TEMPLATE_CREATE_DEFAULT_LATLON,TEMPLATE_DEFAULT_MAP_DETAIL]
 
     @staticmethod
     def create_param_template(filepath="",name="",showinfo=True):
@@ -61,7 +63,7 @@ class Controller(object):
         # Reference to Exif Tool / TEMPLATE_EXIF
         tpl_dict["INFO_EXIFTOOL_FILE"] = "INFO: Enter full path to your EXIFTOOL.EXE executable"
         tpl_dict["EXIFTOOL_FILE"] ="exiftool.exe"
-        
+
         # Work Directory / TEMPLATE_WORK_DIR
         tpl_dict["INFO_WORK_DIR"] = "INFO: Work Directory, If supplied only file names need to be supplied"
         tpl_dict["WORK_DIR"] = "_workdir_"
@@ -85,8 +87,10 @@ class Controller(object):
         tpl_dict["GPX_FILE"] = "geo.gpx"       
         tpl_dict["INFO_DEFAULT_LATLON"] = "DEFAULT LAT LON COORDINATES if Geocoordinates or GPX Data can't be found"
         tpl_dict["DEFAULT_LATLON"] = (49.01304,8.40433)  
-        tpl_dict["INFO_CREATE_LATLON"] = "Create LATLON FILE, values (0:ignore, C:create, R:read , U:update"
+        tpl_dict["INFO_CREATE_LATLON"] = "Create LATLON FILE, values (0:ignore, C:create, R:read , U:update)"
         tpl_dict["CREATE_LATLON"] = Persistence.MODE_CREATE     
+        tpl_dict["INFO_CREATE_DEFAULT_LATLON"] = "Create Default LATLON FILE, values (0:ignore, C:create, R:read , U:update)"
+        tpl_dict["CREATE_DEFAULT_LATLON"] = Persistence.MODE_CREATE            
         tpl_dict["INFO_DEFAULT_LATLON_FILE"] = "DEFAULT LAT LON FILE PATH for Default Geocoordinates if they can't be found"
         tpl_dict["DEFAULT_LATLON_FILE"] = "default.gps"          
         tpl_dict["INFO_DEFAULT_MAP_DETAIL"] = "DEFAULT Detail level for map links (1...18)"
@@ -106,7 +110,7 @@ class Controller(object):
         """ reads control parameters from file and returns them
             as dictionary """
 
-        IGNORE = ["WORK_DIR","TIMEZONE","CREATE_LATLON"]
+        IGNORE = ["WORK_DIR","TIMEZONE","CREATE_DEFAULT_LATLON"]
 
         """ reads control parameters from file """
         control_params = {}
@@ -128,14 +132,14 @@ class Controller(object):
         timezone = params_raw.get("TIMEZONE","Europe/Berlin")
         control_params["TIMEZONE"] = timezone
 
-        create_latlon = params_raw.get("CREATE_LATLON",Persistence.MODE_READ)
-        control_params["CREATE_LATLON"] = create_latlon
-        control_params["CREATE_LATLON_TEXT"] = Persistence.MODE_TXT.get(create_latlon,"NA")
+        create_default_latlon = params_raw.get("CREATE_DEFAULT_LATLON",Persistence.MODE_READ)
+        control_params["CREATE_DEFAULT_LATLON"] = create_default_latlon
+        control_params["CREATE_DEFAULT_LATLON_TEXT"] = Persistence.MODE_TXT.get(create_default_latlon,"NA")
 
         if showinfo is True:
             print(f"WORKING DIRECTORY -> {work_dir}")
             print(f"TIME ZONE -> {timezone}")
-            print(f"CREATE LATLON DEFAULT FILE -> {create_latlon} ({Persistence.MODE_TXT[create_latlon]})")
+            print(f"CREATE LATLON DEFAULT FILE -> {create_default_latlon} ({Persistence.MODE_TXT[create_default_latlon]})")
 
         for k,v in params_raw.items():
 
@@ -163,27 +167,38 @@ class Controller(object):
 
             #convert to full path
             if "FILE" in K:
-
-                object_filter_list=[Persistence.OBJECT_FILE]
-                if K == "DEFAULT_LATLON_FILE":
-
-                    # read is default 
-                    object_filter_list = [Persistence.OBJECT_FILE] 
-
-                    if create_latlon == Persistence.MODE_IGNORE:
-                        object_filter_list = [] 
-                    elif create_latlon == Persistence.MODE_CREATE:
-                        object_filter_list = [Persistence.OBJECT_FILE,Persistence.OBJECT_NEW_FILE]      
                 
-                for object_filter in object_filter_list:
-                    object_filter_s = [object_filter]     
-                    full_path = Persistence.get_file_full_path(filepath=work_dir,filename=v,object_filter=object_filter_s,showinfo=False)    
-                    if not full_path is None:
-                        control_params[K] = full_path
-                        key_file_info = K+"_OBJECT"
-                        control_params[key_file_info] = object_filter_s[0]
-                        if showinfo:
-                            print(f"   File Parameter {k} points to {full_path} (object {object_filter_s})")
+                object_filter = [Persistence.OBJECT_FILE,Persistence.OBJECT_NEW_FILE]
+                full_path = Persistence.get_file_full_path(filepath=work_dir,filename=v,object_filter=object_filter,showinfo=False) 
+                if full_path is None:
+                    print(f"Couldn't get a path for filepath {work_dir} and filename {v} ")
+                    continue
+
+                file_actions = Persistence.get_filepath_info(full_path)["actions"]
+                control_params[K] = full_path
+                control_params[(K+"_ACTIONS")] = file_actions
+
+                # object_filter_list=[Persistence.OBJECT_FILE]
+                # if K == "DEFAULT_LATLON_FILE":
+                #     print(K,v)
+
+                #     # read is default 
+                #     object_filter_list = [Persistence.OBJECT_FILE] 
+
+                #     if create_default_latlon == Persistence.MODE_IGNORE:
+                #         object_filter_list = [] 
+                #     elif create_default_latlon in Persistence.ACTIONS_NEW_FILE:
+                #         object_filter_list = [Persistence.OBJECT_FILE,Persistence.OBJECT_NEW_FILE]      
+                
+                # for object_filter in object_filter_list:
+                #     object_filter_s = [object_filter]     
+                #     full_path = Persistence.get_file_full_path(filepath=work_dir,filename=v,object_filter=object_filter_s,showinfo=False)    
+                #     if not full_path is None:
+                #         control_params[K] = full_path
+                #         key_file_info = K+"_OBJECT"
+                #         control_params[key_file_info] = object_filter_s[0]
+                #         if showinfo:
+                #             print(f"   File Parameter {k} points to {full_path} (object {object_filter_s})")
                     
                 continue
 
@@ -233,16 +248,19 @@ class Controller(object):
     @staticmethod
     def prepare_execution(template_dict:dict,showinfo=False):
         """ validates template and checks, which actions can be done (reading hierarchy,geodata, exiftool,...) """
-
-        def param_has_fileref(param):
-            key = param + "_FILE_OBJECT"
-            return ( ( template_dict.get(key,None) == Persistence.OBJECT_FILE ) or
-                     ( template_dict.get(key,None) == Persistence.OBJECT_NEW_FILE ) )
         
         input_dict = {}
 
+        def is_file(param):
+            p = param + "_FILE_ACTIONS"
+            return ( template_dict.get(p) == Persistence.ACTIONS_FILE )
+        
+        def is_new_file(param):
+            p = param + "_FILE_ACTIONS"
+            return ( template_dict.get(p) == Persistence.ACTIONS_NEW_FILE )
+
         # get exiftool availability
-        if param_has_fileref(Controller.TEMPLATE_EXIFTOOL):            
+        if is_file(Controller.TEMPLATE_EXIFTOOL):            
             input_dict[Controller.TEMPLATE_EXIFTOOL] = template_dict[(Controller.TEMPLATE_EXIFTOOL+"_FILE")]
             exiftool_ref = input_dict[Controller.TEMPLATE_EXIFTOOL]
         else:
@@ -260,7 +278,7 @@ class Controller(object):
         # read keyword hierarchy
         keyword_hier = {}
 
-        if param_has_fileref(Controller.TEMPLATE_KEYWORD_HIER):
+        if is_file(Controller.TEMPLATE_KEYWORD_HIER):
             f = template_dict[(Controller.TEMPLATE_KEYWORD_HIER+"_FILE")]
             try:
                 hier_raw = Persistence.read_file(f)
@@ -272,7 +290,7 @@ class Controller(object):
          
         # get default metadata (keyword and others) from file
         meta = {}
-        if param_has_fileref(Controller.TEMPLATE_META):
+        if  is_file(Controller.TEMPLATE_META):
             f = template_dict[(Controller.TEMPLATE_META+"_FILE")]
             try:
                 meta_raw = Persistence.read_file(f)
@@ -288,9 +306,10 @@ class Controller(object):
         input_dict[Controller.TEMPLATE_TIMEZONE]  = template_dict.get(Controller.TEMPLATE_TIMEZONE,"Europe/Berlin")
         map_detail = template_dict.get(Controller.TEMPLATE_DEFAULT_MAP_DETAIL,18)
         input_dict[Controller.TEMPLATE_DEFAULT_MAP_DETAIL]  = map_detail
+        input_dict[Controller.TEMPLATE_CREATE_LATLON]  = template_dict.get(Controller.TEMPLATE_CREATE_LATLON,"C")
 
         # calibration image file and date, calculate offset
-        if param_has_fileref(Controller.TEMPLATE_CALIB_IMG): 
+        if is_file(Controller.TEMPLATE_CALIB_IMG): 
             f = template_dict.get((Controller.TEMPLATE_CALIB_IMG+"_FILE"))
             
             # gps time (as stored in template file / read from image)
@@ -320,35 +339,42 @@ class Controller(object):
                 
         # read / create default latlon file and get default reverse data
         default_lat_lon = template_dict.get(Controller.TEMPLATE_DEFAULT_LATLON,None)
-        
-        if default_lat_lon is not None:
-            create_lat_lon =  template_dict.get(Controller.TEMPLATE_CREATE_LATLON,Persistence.MODE_READ)
-            input_dict[Controller.TEMPLATE_DEFAULT_LATLON]  = default_lat_lon
-            input_dict[Controller.TEMPLATE_CREATE_LATLON]  = create_lat_lon
-            
 
-            if param_has_fileref(Controller.TEMPLATE_DEFAULT_LATLON):
-                k = Controller.TEMPLATE_DEFAULT_LATLON+"_FILE"
-                f = template_dict.get(k)
-                input_dict[k] = f 
-                ko = Controller.TEMPLATE_DEFAULT_LATLON+"_FILE_OBJECT"
-                fo = template_dict.get(ko)
-                input_dict[ko] = fo 
-                
-                remote = False
-                save = False
-                
-                # create /update: get latlon from service, save 
-                if ( ( fo == Persistence.OBJECT_NEW_FILE and create_lat_lon == Persistence.MODE_CREATE ) or
-                   ( fo == Persistence.OBJECT_FILE and create_lat_lon in "CU" ) ):
-                    remote = True
+        if default_lat_lon is not None:
+            
+            op_default_lat_lon =  template_dict.get(Controller.TEMPLATE_CREATE_DEFAULT_LATLON,Persistence.MODE_READ)
+            input_dict[Controller.TEMPLATE_DEFAULT_LATLON]  = default_lat_lon
+            input_dict[Controller.TEMPLATE_CREATE_DEFAULT_LATLON]  = op_default_lat_lon
+            k = Controller.TEMPLATE_DEFAULT_LATLON+"_FILE"
+            f = template_dict.get(k)
+            ka = k+"_ACTIONS"
+            f_actions = template_dict.get(ka)
+            input_dict[k] = f
+            input_dict[ka] = f_actions 
+            
+            save = False
+            remote = False
+
+            if ( op_default_lat_lon in f_actions ):
+
+                if op_default_lat_lon in Persistence.ACTIONS_CHANGE_FILE:
                     save = True
-                
+
+                    if not op_default_lat_lon == Persistence.MODE_DELETE:
+                        remote = True
+
                 # retrieve the nominatim data either from local file or from service
-                if create_lat_lon in "CRU":
+                if not op_default_lat_lon == Persistence.MODE_DELETE:
                     input_dict[Controller.TEMPLATE_DEFAULT_REVERSE_GEO] = Controller.retrieve_nominatim_reverse(filepath=f,
                                                                             latlon=default_lat_lon,save=save,
-                                                                            zoom=map_detail,remote=remote,debug=False)         
+                                                                            zoom=map_detail,remote=remote,debug=True)    
+                else:
+                    print("DELETE OPERATION CURRENTLY NOT SUPPORTED") 
+
+            # file operations not possible
+            else:
+                print(f"file {f} can be used: {is_file(Controller.TEMPLATE_CREATE_DEFAULT_LATLON)}")
+                print(f"file operation {op_default_lat_lon} ({Persistence.MODE_TXT.get(op_default_lat_lon)}), allowed values {f_actions}")
 
         # get gpx file
 

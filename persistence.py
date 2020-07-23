@@ -24,11 +24,16 @@ class Persistence:
 
     # file operations
     MODE_IGNORE = "0"
-    MODE_READ =  "R"
-    MODE_UPDATE = "U"
     MODE_CREATE = "C"
+    MODE_READ   =  "R"
+    MODE_UPDATE = "U"    
     MODE_DELETE = "D"
-    MODE_TXT = { "0":"MODE IGNORE", "R":"MODE READ","U":"MODE UPDATE","C":"MODE CREATE","D":"MODE DELETE"}
+    MODE_CREATE_UPDATE = "X"
+    MODE_TXT = { "0":"MODE IGNORE", "R":"MODE READ","U":"MODE UPDATE","C":"MODE CREATE","D":"MODE DELETE","X":"MODE CREATE UPDATE"}
+    # allowed file actions
+    ACTIONS_NEW_FILE = "XC"
+    ACTIONS_FILE = "XRUD"
+    ACTIONS_CHANGE_FILE = "XUDC"
 
     # regex pattern for a raw file name: 3 letters 5 decimals
     REGEX_RAW_FILE_NAME = r"[a-zA-Z]{3}\d{5}"
@@ -403,8 +408,14 @@ class Persistence:
         """ returns metainfo for a given file path 
             Notabene: doesn't fully work in Desktop folders in Windows (folder info wrong) """
         fileinfo = {}
-        fileinfo["filepath"] = os.path.normpath(filepath)
-        p = Path(filepath)
+        try:
+            np = os.path.normpath(filepath)
+            p = Path(np)
+        except:
+            np = str(f"ERROR in filepath {filepath}")
+            p = Path("")
+
+        fileinfo["filepath"] = np
         fileinfo["parts"] = list(p.parts)
         fileinfo["parent"] = str(p.parent)
         fileinfo["stem"] = p.stem
@@ -440,6 +451,7 @@ class Persistence:
         
         if fileinfo["is_file"]:
             fileinfo["object"]  = Persistence.OBJECT_FILE
+            fileinfo["actions"] = Persistence.ACTIONS_FILE
 
         # create potentially new folder name / file name
         if ( fileinfo["existing_parent"] is not None and fileinfo["object"] is None):
@@ -447,10 +459,15 @@ class Persistence:
                 fileinfo["object"]  = Persistence.OBJECT_NEW_FOLDER
             else:
                 fileinfo["object"]  = Persistence.OBJECT_NEW_FILE
+                fileinfo["actions"] = Persistence.ACTIONS_NEW_FILE
+
+        # path is wrong, no actions possible
+        if ( not parent_is_dir ) and ( len(p.parts) > 1 ) :
+            fileinfo["actions"] = Persistence.MODE_IGNORE
 
         if showinfo:
             for k,v in fileinfo.items():
                 print(f"{k} -> {v}")
-            
+
         return fileinfo
             
