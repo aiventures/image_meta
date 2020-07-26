@@ -1,7 +1,9 @@
 import re
 from datetime import datetime
 from datetime import timedelta
-
+from dateutil.parser import parse
+from dateutil.tz import tzutc
+from dateutil.tz import tzoffset
 import pytz
 
 class Util:
@@ -33,7 +35,7 @@ class Util:
                 timezone_loc = pytz.timezone(local_tz)
                 dt_s = datetime_s[0:4]+"-"+datetime_s[5:7]+"-"+datetime_s[8:10]+" "+datetime_s[11:13]+"-"+datetime_s[14:16]+"-"+datetime_s[17:19]
                 dt = datetime.strptime(dt_s,"%Y-%m-%d %H-%M-%S")
-                dt = timezone_loc.localize(dt)
+                dt = timezone_loc.localize(dt) # abstain from datetime.replace :-) ...
             except:
                 return 0
 
@@ -93,6 +95,60 @@ class Util:
         return delta_time        
 
     @staticmethod
+    def get_localized_datetime(dt_in,tz_in="Europe/Berlin",tz_out="UTC",as_timestamp=False,debug=False):
+        """helper method to get non naive datetime (based on input and output timezone), 
+           input date can be string or datetime,
+           timezone can be string or pytz object, optionally returns also as utc timestamp"""
+        
+        def get_tz_info(tz):
+            if isinstance(tz,pytz.BaseTzInfo):
+                tz_info = tz
+            elif isinstance(tz_in,str):
+                tz_info = pytz.timezone(tz)
+            else:
+                tz_info = pytz.timezone("UTC")
+            return tz_info
+        
+        tz_utc = pytz.timezone("UTC")
+        pytz_in = get_tz_info(tz_in)
+        pytz_out = get_tz_info(tz_out)
+
+        if isinstance(dt_in,datetime):
+            dt = dt_in
+        elif isinstance(dt_in,str):
+            # utc code
+            if dt_in[-1] == "Z":
+                dt_in = dt_in[:-1]+"+00:00"
+            dt = parse(dt_in)
+        
+        tz_info = dt.tzinfo
+        
+        # naive datetime, convert to input timezone
+        if tz_info is None:
+            dt = pytz_in.localize(dt)
+            tz_info = dt.tzinfo
+
+        # convert to utc time formats
+        if (isinstance(tz_info,tzutc)) or (isinstance(tz_info,tzoffset)):
+            dt_utc = dt.astimezone(tz_utc)
+        else:
+            dt_utc = tz_utc.normalize(dt)
+        
+        # convert to target timezone
+        if as_timestamp:
+            out = dt_utc.timestamp()
+        else:
+            out = dt_utc.astimezone(pytz_out)
+        
+        if debug is True:
+            print(f"date IN: {dt_in} -> datetime {dt} ({pytz_in})")
+            print(f"  -> UTC datetime {dt_utc} -> datetime {out} ({pytz_out})")
+            ts = dt_utc.timestamp()
+            print(f"  -> Timestamp {ts} with UTC datetime {datetime.utcfromtimestamp(ts)}")        
+        return out
+            
+
+    @staticmethod
     def get_nearby_index(value,sorted_list:list,debug=False):
         """ returns index for closest value in a sorted list for a given input value,
             uses binary search
@@ -132,3 +188,31 @@ class Util:
             if debug is True:
                 print("List: ",sorted_list[idx_min:idx_max])    
         return idx
+    
+    @staticmethod
+    def print_dict_info(d:dict,s="",show_info=True,list_elems=9999,verbose=True):
+        """ prints information in dictionary """
+        
+        if not show_info:
+            return
+
+        if s != "":
+            print(f"--- Dictionary Content {s} ---")
+
+        for k,v in d.items():
+            s = ""
+            n = 0
+            if isinstance(v,list):
+                n = min(len(v),list_elems)
+                print(f"Element {k} has list with {len(v)} elements, showing {n} elements")                
+                print(f"   {k}  ->  {v[:n]}")
+            elif isinstance(v,dict):
+                n = min(len(v.keys()),list_elems)
+                print(f"Element {k} has dictionary with {len(v.keys())} attributes, showing {n} attributes")
+                d_keys = list(v.keys())[:n]
+                s = f"   {k}  ->  "
+                for d_key in d_keys:
+                    s += f"\n   {d_key}:{v[d_key]}"
+                print(s)
+            else:
+                print(f"   {k}  ->   {v}")
