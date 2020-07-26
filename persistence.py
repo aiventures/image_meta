@@ -161,8 +161,8 @@ class Persistence:
                     
                 if (debug is True):
                     url = r"https://www.openstreetmap.org/#map=16/"+str(lat)+r"/"+str(lon)
-                    dt = datetime.utcfromtimestamp(ts).astimezone(tz)
-                    print(f"Reading Track {track_name} ... {gps_pts} Points, Date {dt}")
+                    dt = pytz.utc.localize(datetime.utcfromtimestamp(ts)).astimezone(tz)
+                    print(f"Reading Track {track_name} ... {gps_pts} Points, Last Date {dt}")
                     if heart_rate > 0:
                         print(f"Running watch: heart rate {heart_rate} cadence {cadence} ")
                     print(f"elevation {ele} last coordinate {url}")

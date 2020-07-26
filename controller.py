@@ -22,6 +22,7 @@ class Controller(object):
 
     # input parameters for exif
     TEMPLATE_WORK_DIR = "WORK_DIR"
+    TEMPLATE_IMG_EXTENSIONS = "IMG_EXTENSIONS"
     TEMPLATE_EXIFTOOL = "EXIFTOOL"
     TEMPLATE_META = "META"
     TEMPLATE_OVERWRITE_KEYWORD = "OVERWRITE_KEYWORD"
@@ -36,7 +37,8 @@ class Controller(object):
     TEMPLATE_CREATE_DEFAULT_LATLON = "CREATE_DEFAULT_LATLON"  
     TEMPLATE_DEFAULT_MAP_DETAIL = "DEFAULT_MAP_DETAIL"
     TEMPLATE_DEFAULT_REVERSE_GEO = "DEFAULT_REVERSE_GEO"
-    TEMPLATE_PARAMS = [TEMPLATE_WORK_DIR,TEMPLATE_EXIFTOOL, TEMPLATE_META, TEMPLATE_OVERWRITE_KEYWORD, TEMPLATE_KEYWORD_HIER, TEMPLATE_TIMEZONE,
+    TEMPLATE_PARAMS = [TEMPLATE_WORK_DIR,TEMPLATE_IMG_EXTENSIONS,TEMPLATE_EXIFTOOL, TEMPLATE_META, TEMPLATE_OVERWRITE_KEYWORD, 
+                       TEMPLATE_KEYWORD_HIER, TEMPLATE_TIMEZONE,
                        TEMPLATE_CALIB_IMG, TEMPLATE_CALIB_DATETIME,TEMPLATE_GPX, TEMPLATE_DEFAULT_LATLON,TEMPLATE_CREATE_LATLON,
                        TEMPLATE_CREATE_DEFAULT_LATLON,TEMPLATE_DEFAULT_MAP_DETAIL]
 
@@ -67,6 +69,8 @@ class Controller(object):
         # Work Directory / TEMPLATE_WORK_DIR
         tpl_dict["INFO_WORK_DIR"] = "INFO: Work Directory, If supplied only file names need to be supplied"
         tpl_dict["WORK_DIR"] = "_workdir_"
+        tpl_dict["INFO_IMG_EXTENSIONS"] = "INFO: Supported Image File Extensions"
+        tpl_dict["IMG_EXTENSIONS"] = ("jpg","jpeg")
         
         # Keywords / KEYWORD KEYWORD_HIER
         tpl_dict["INFO_KEYWORD_HIER_FILE"] = "INFO: UTF8 Text file containing your metadata keyword hierarchy"
@@ -177,28 +181,6 @@ class Controller(object):
                 file_actions = Persistence.get_filepath_info(full_path)["actions"]
                 control_params[K] = full_path
                 control_params[(K+"_ACTIONS")] = file_actions
-
-                # object_filter_list=[Persistence.OBJECT_FILE]
-                # if K == "DEFAULT_LATLON_FILE":
-                #     print(K,v)
-
-                #     # read is default 
-                #     object_filter_list = [Persistence.OBJECT_FILE] 
-
-                #     if create_default_latlon == Persistence.MODE_IGNORE:
-                #         object_filter_list = [] 
-                #     elif create_default_latlon in Persistence.ACTIONS_NEW_FILE:
-                #         object_filter_list = [Persistence.OBJECT_FILE,Persistence.OBJECT_NEW_FILE]      
-                
-                # for object_filter in object_filter_list:
-                #     object_filter_s = [object_filter]     
-                #     full_path = Persistence.get_file_full_path(filepath=work_dir,filename=v,object_filter=object_filter_s,showinfo=False)    
-                #     if not full_path is None:
-                #         control_params[K] = full_path
-                #         key_file_info = K+"_OBJECT"
-                #         control_params[key_file_info] = object_filter_s[0]
-                #         if showinfo:
-                #             print(f"   File Parameter {k} points to {full_path} (object {object_filter_s})")
                     
                 continue
 
@@ -253,11 +235,7 @@ class Controller(object):
 
         def is_file(param):
             p = param + "_FILE_ACTIONS"
-            return ( template_dict.get(p) == Persistence.ACTIONS_FILE )
-        
-        def is_new_file(param):
-            p = param + "_FILE_ACTIONS"
-            return ( template_dict.get(p) == Persistence.ACTIONS_NEW_FILE )
+            return ( template_dict.get(p) == Persistence.ACTIONS_FILE )    
 
         # get exiftool availability
         if is_file(Controller.TEMPLATE_EXIFTOOL):            
@@ -274,6 +252,9 @@ class Controller(object):
             return
 
         input_dict[Controller.TEMPLATE_WORK_DIR] = work_dir
+
+        # allowed image file extensions
+        input_dict[Controller.TEMPLATE_IMG_EXTENSIONS] = template_dict.get(Controller.TEMPLATE_IMG_EXTENSIONS,["jpg"])
 
         # read keyword hierarchy
         keyword_hier = {}
@@ -301,12 +282,13 @@ class Controller(object):
         input_dict[Controller.TEMPLATE_META] = meta
 
         # copy single template parameters with default values
-        # TEMPLATE_SINGLE_PARAMS = [TEMPLATE_OVERWRITE_KEYWORD,TEMPLATE_TIMEZONE,TEMPLATE_DEFAULT_MAP_DETAIL]
         input_dict[Controller.TEMPLATE_OVERWRITE_KEYWORD]  = template_dict.get(Controller.TEMPLATE_OVERWRITE_KEYWORD,False)
-        input_dict[Controller.TEMPLATE_TIMEZONE]  = template_dict.get(Controller.TEMPLATE_TIMEZONE,"Europe/Berlin")
+        tz = template_dict.get(Controller.TEMPLATE_TIMEZONE,"Europe/Berlin")
+        input_dict[Controller.TEMPLATE_TIMEZONE] = tz
         map_detail = template_dict.get(Controller.TEMPLATE_DEFAULT_MAP_DETAIL,18)
         input_dict[Controller.TEMPLATE_DEFAULT_MAP_DETAIL]  = map_detail
         input_dict[Controller.TEMPLATE_CREATE_LATLON]  = template_dict.get(Controller.TEMPLATE_CREATE_LATLON,"C")
+
 
         # calibration image file and date, calculate offset
         if is_file(Controller.TEMPLATE_CALIB_IMG): 
@@ -322,8 +304,6 @@ class Controller(object):
                 try:
                     # datetime of image
                     dt_img_s = meta_dict_list[f]["CreateDate"]
-                    #time zone
-                    tz = input_dict[Controller.TEMPLATE_TIMEZONE]
                     # datetime of image(cam) / gps time and offset
                     dt_img = Util.get_datetime_from_string(datetime_s=dt_img_s,local_tz=tz,debug=False)
                     dt_gps = Util.get_datetime_from_string(datetime_s=dt_gps_s,local_tz=tz,debug=False)
@@ -367,7 +347,7 @@ class Controller(object):
                 if not op_default_lat_lon == Persistence.MODE_DELETE:
                     input_dict[Controller.TEMPLATE_DEFAULT_REVERSE_GEO] = Controller.retrieve_nominatim_reverse(filepath=f,
                                                                             latlon=default_lat_lon,save=save,
-                                                                            zoom=map_detail,remote=remote,debug=True)    
+                                                                            zoom=map_detail,remote=remote,debug=showinfo)    
                 else:
                     print("DELETE OPERATION CURRENTLY NOT SUPPORTED") 
 
@@ -377,6 +357,18 @@ class Controller(object):
                 print(f"file operation {op_default_lat_lon} ({Persistence.MODE_TXT.get(op_default_lat_lon)}), allowed values {f_actions}")
 
         # get gpx file
+        if is_file(Controller.TEMPLATE_GPX):
+            k = Controller.TEMPLATE_GPX+"_FILE"
+            f = template_dict.get(k,"")
+            ka = k+"_ACTIONS"
+            input_dict[k] = f
+            input_dict[ka] = template_dict.get(ka,"")
+            gpx_data = Persistence.read_gpx(gpsx_path=f,debug=showinfo,tz=pytz.timezone(tz))
+            input_dict[Controller.TEMPLATE_GPX] = gpx_data
+        
+        # if showinfo:
+        #     for k,v in InterruptedError.items()
+        Util.print_dict_info(d=input_dict,show_info=showinfo,list_elems=3)
 
 
         return input_dict        
