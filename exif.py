@@ -3,6 +3,7 @@
 import subprocess
 import os
 import json
+import traceback
 from datetime import datetime
 from image_meta.persistence import Persistence
 from image_meta.util import Util
@@ -202,7 +203,13 @@ class ExifTool(object):
 
         for f in fileref:
             arg_dict = {}
-            args = self.execute(*arg_list,f).split(self.NEW_LINE)
+
+            try:
+                args = self.execute(*arg_list,f).split(self.NEW_LINE)
+            except:
+                print(f"Exception with file {f}, exiftool params {arg_list} processing will be skipped")
+                print(traceback.format_exc())
+                continue
 
             for arg in args:
                 l = len(arg)
@@ -211,16 +218,25 @@ class ExifTool(object):
                 idx = arg.find("=")
                 meta_key = arg[1:idx]
                 if metafilter is not None:
-                    if not ( meta_key in metafilter ):                        
+                    if not ( meta_key in metafilter ):        
                         continue
                 meta_value = arg[idx+1:l]
-                
+
                 # values contains a list
                 if ( meta_key in list_metadata ) : 
                     meta_value = meta_value.split(ExifTool.EXIF_LIST_SEP)
+                
                 arg_dict[meta_key] = meta_value
+                
             file_dir = arg_dict.get("Directory",None)
             file_name = arg_dict.get("FileName",None)
+
+#           get path and filename from fileref
+            if file_dir is None or file_name is None:
+                filepath_info = Persistence.get_filepath_info(filepath=f)
+                file_dir = filepath_info["parent"]
+                file_name = f[(len(file_dir)+1):]                
+
             file_path = os.path.normpath(os.path.join(file_dir,file_name))
             meta_arg_dict[file_path] = arg_dict    
         
