@@ -26,7 +26,17 @@ class Controller(object):
     TEMPLATE_EXIFTOOL = "EXIFTOOL"
     TEMPLATE_META = "META"
     TEMPLATE_OVERWRITE_KEYWORD = "OVERWRITE_KEYWORD"
+    TEMPLATE_OVERWRITE_META = "OVERWRITE_META"
     TEMPLATE_KEYWORD_HIER = "KEYWORD_HIER"
+    TEMPLATE_TECH_KEYWORDS = "TECH_KEYWORDS"
+
+    # Copyright Fields
+    TEMPLATE_COPYRIGHT = "COPYRIGHT"
+    TEMPLATE_COPYRIGHT_NOTICE = "COPYRIGHT_NOTICE"
+    TEMPLATE_CREDIT = "CREDIT"
+    TEMPLATE_SOURCE = "SOURCE"
+
+    # Geocoordinate Handling
     TEMPLATE_TIMEZONE = "TIMEZONE"
     TEMPLATE_CALIB_IMG = "CALIB_IMG"
     TEMPLATE_CALIB_DATETIME = "CALIB_DATETIME"
@@ -37,8 +47,11 @@ class Controller(object):
     TEMPLATE_CREATE_DEFAULT_LATLON = "CREATE_DEFAULT_LATLON"  
     TEMPLATE_DEFAULT_MAP_DETAIL = "DEFAULT_MAP_DETAIL"
     TEMPLATE_DEFAULT_REVERSE_GEO = "DEFAULT_REVERSE_GEO"
+
+
     TEMPLATE_PARAMS = [TEMPLATE_WORK_DIR,TEMPLATE_IMG_EXTENSIONS,TEMPLATE_EXIFTOOL, TEMPLATE_META, TEMPLATE_OVERWRITE_KEYWORD, 
-                       TEMPLATE_KEYWORD_HIER, TEMPLATE_TIMEZONE,
+                       TEMPLATE_OVERWRITE_META, TEMPLATE_KEYWORD_HIER, TEMPLATE_TECH_KEYWORDS, TEMPLATE_COPYRIGHT, 
+                       TEMPLATE_COPYRIGHT_NOTICE, TEMPLATE_CREDIT, TEMPLATE_SOURCE, TEMPLATE_TIMEZONE,
                        TEMPLATE_CALIB_IMG, TEMPLATE_CALIB_DATETIME,TEMPLATE_GPX, TEMPLATE_DEFAULT_LATLON,TEMPLATE_CREATE_LATLON,
                        TEMPLATE_CREATE_DEFAULT_LATLON,TEMPLATE_DEFAULT_MAP_DETAIL]
 
@@ -75,10 +88,24 @@ class Controller(object):
         # Keywords / KEYWORD KEYWORD_HIER
         tpl_dict["INFO_KEYWORD_HIER_FILE"] = "INFO: UTF8 Text file containing your metadata keyword hierarchy"
         tpl_dict["KEYWORD_HIER_FILE"] = "_keyword_hier_file_"
+        tpl_dict["INFO_TECH_KEYWORDS"] = "INFO: Generate keywords with camera detail settings"
+        tpl_dict["TECH_KEYWORDS"] = True
         tpl_dict["INFO_META_FILE"] = "INFO: UTF8 Text file with additonal meta data, each entry line needs to be in args format, eg '-keywords=...'"
         tpl_dict["META_FILE"] = "_meta_file_"
         tpl_dict["INFO_OVERWRITE_KEYWORD"] = "INFO: Overwrite Keywords / Hier Subject or append from meta file "
         tpl_dict["OVERWRITE_KEYWORD"] = False
+        tpl_dict["INFO_OVERWRITE_META"] = "INFO: Overwrite with Metadata from metadata template file"
+        tpl_dict["OVERWRITE_META"] = True
+
+        # Copyright Info
+        tpl_dict["INFO_COPYRIGHT"] = "INFO:Copyright" 
+        tpl_dict["COPYRIGHT"] = "AUTHOR" 
+        tpl_dict["INFO_COPYRIGHT_NOTICE"] = "INFO:Image copyright Notice" 
+        tpl_dict["COPYRIGHT_NOTICE"] = "(C) 2020 AUTHOR All Rights Reserved" 
+        tpl_dict["INFO_CREDIT"] = "INFO:Image Credit"
+        tpl_dict["CREDIT"] = "AUTHOR"  
+        tpl_dict["INFO_SOURCE"] = "INFO:Image Source"
+        tpl_dict["SOURCE"] = "AUTHOR"  
         
         # Geo Coordinate Handling / 
         tpl_dict["INFO_CALIB_IMG_FILE"] = "INFO: image displaying time of your GPS "
@@ -366,9 +393,6 @@ class Controller(object):
             gpx_data = Persistence.read_gpx(gpsx_path=f,debug=showinfo,tz=pytz.timezone(tz))
             input_dict[Controller.TEMPLATE_GPX] = gpx_data
         
-        # if showinfo:
-        #     for k,v in InterruptedError.items()
         Util.print_dict_info(d=input_dict,show_info=showinfo,list_elems=3)
-
 
         return input_dict        
