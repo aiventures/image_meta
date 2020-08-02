@@ -9,6 +9,8 @@ import pytz
 class Util:
     """ util module """
 
+    NOT_FOUND = -1
+
     @staticmethod
     def get_datetime_from_string(datetime_s:str,local_tz='Europe/Berlin',debug=False) -> str:
         """ returns datetime for date string with timezone 
@@ -100,6 +102,8 @@ class Util:
            input date can be string or datetime,
            timezone can be string or pytz object, optionally returns also as utc timestamp"""
         
+        reg_expr_datetime = "\\d{4}[-:]\\d{2}[:-]\\d{2} \\d{2}[:-]\\d{2}[:-]\\d{2}"       
+        
         def get_tz_info(tz):
             if isinstance(tz,pytz.BaseTzInfo):
                 tz_info = tz
@@ -116,6 +120,10 @@ class Util:
         if isinstance(dt_in,datetime):
             dt = dt_in
         elif isinstance(dt_in,str):
+            # convert date hyphens
+            if (len(re.findall(reg_expr_datetime, dt_in))==1):
+                dt_in = (dt_in[:10].replace(":","-")+dt_in[10:])
+            
             # utc code
             if dt_in[-1] == "Z":
                 dt_in = dt_in[:-1]+"+00:00"
