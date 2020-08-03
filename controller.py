@@ -396,3 +396,79 @@ class Controller(object):
         Util.print_dict_info(d=input_dict,show_info=showinfo,list_elems=3)
 
         return input_dict        
+    
+    @staticmethod
+    def prepare_img_write(params:dict,show_info=False):
+        """ blend template and metadata for each image file """
+        
+# (['EXIFTOOL', 'WORK_DIR', 'IMG_EXTENSIONS', 'KEYWORD_HIER', 'META', 'OVERWRITE_KEYWORD', 'TIMEZONE', 
+# 'DEFAULT_MAP_DETAIL', 'CREATE_LATLON', 'CALIB_IMG', 'CALIB_DATETIME', 'CALIB_OFFSET', 'DEFAULT_LATLON', 
+# 'CREATE_DEFAULT_LATLON', 'DEFAULT_LATLON_FILE', 'DEFAULT_LATLON_FILE_ACTIONS', 'DEFAULT_REVERSE_GEO', 'GPX_FILE', 'GPX_FILE_ACTIONS', 'GPX'])
+
+        workdir = params.get("WORK_DIR",None)
+        exif_ref = params.get("EXIFTOOL",None)
+        ext = params.get("IMG_EXTENSIONS",["jpg","jpeg"])
+        gpx = params.get("GPX",None)
+        timezone = params.get("TIMEZONE","Europe/Berlin")
+        
+        if not gpx is None:
+            gpx_keys = sorted(gpx.keys())
+        else:    
+            gpx_keys = []
+        
+        metadata_filter = ExifTool.IMG_SEGMENT
+
+        if (workdir is None) or (exif_ref is None):
+            print(f"Exiftool: {exif_ref} Work Dir: {workdir}, run can't be executed")
+            return None
+        
+        # read all metadata
+        with ExifTool(exif_ref,debug=show_info) as exif:
+            img_meta_list = exif.get_metadict_from_img(filenames=workdir,metafilter=metadata_filter,filetypes=ext)
+
+        for fileref,metadata_list in img_meta_list.items():
+            creation_date = metadata_list.get("CreateDate",None)
+            creation_timestamp = Util.get_localized_datetime(dt_in=creation_date,tz_in=timezone,tz_out="UTC",
+                                                             debug=False,as_timestamp=True) 
+                                                            
+            if isinstance(creation_timestamp,int):
+                creation_datetime = datetime.utcfromtimestamp(creation_timestamp)
+            else:
+                creation_datetime = None
+
+            if show_info:
+                print(f"\n --- File {fileref} timestamp {creation_timestamp} UTC {creation_datetime} ---")
+
+            #get metadata
+            #get technical metadata
+            #get hierarchical metadata
+            #copyright info
+            #gps metadata
+            #read reverse geo info
+
+        
+# for img_meta_key,value in img_meta_list.items():
+#     cr_date = value.get('CreateDate',None)
+#     if cr_date is None:
+#         print(f"XXXX No Creation date for file {img_meta_key}")
+#         continue
+#     print(cr_date)
+#     #cr_date = (cr_date[:10].replace(":","-")+cr_date[10:]) # replace colons in date / TODO regex in handling routine
+#     dts = Util.get_localized_datetime(dt_in=cr_date,tz_in="Europe/Berlin",tz_out="Europe/Berlin",
+#                                      debug=False,as_timestamp=True) 
+#     print(f"Create Date {cr_date} (Europe/Berlin) UTC Timestamp {dts}")
+#     timestamp_index = None
+#     timestamp_index = Util.get_nearby_index(dts,sorted_list=gpx_keys,debug=False)
+#     if timestamp_index != Util.NOT_FOUND:
+#         ts_gpx = gpx_keys[timestamp_index]
+#         dt_gpx = datetime.datetime.utcfromtimestamp(ts_gpx)
+#         print(f"---GPS DATA AT TIMESTAMP {ts_gpx} UTC {dt_gpx} ---\n",gpx[ts_gpx])
+#     else:
+#         print(" Couldn't match GPS Data")
+#     for k,v in value.items():
+#         print(f"{k} -> {v}")
+    
+#     tech_keywords = ExifTool.get_tech_keywords_from_metadict(value)
+#     print("Tech Keywords",tech_keywords)        
+
+        return None

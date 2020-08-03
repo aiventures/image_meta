@@ -112,10 +112,15 @@ class Util:
             else:
                 tz_info = pytz.timezone("UTC")
             return tz_info
+
+        if dt_in is None:
+            return None
         
         tz_utc = pytz.timezone("UTC")
         pytz_in = get_tz_info(tz_in)
         pytz_out = get_tz_info(tz_out)
+
+
 
         if isinstance(dt_in,datetime):
             dt = dt_in
