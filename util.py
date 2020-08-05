@@ -149,7 +149,7 @@ class Util:
         
         # convert to target timezone
         if as_timestamp:
-            out = dt_utc.timestamp()
+            out = int(dt_utc.timestamp())
         else:
             out = dt_utc.astimezone(pytz_out)
         
@@ -171,6 +171,9 @@ class Util:
         idx_min = 0
         idx_max = len(sorted_list)
         idx_old = -2
+
+        if value is None:
+            return Util.NOT_FOUND
         
         finished = False
 

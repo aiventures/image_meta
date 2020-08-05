@@ -52,8 +52,12 @@ class Controller(object):
     TEMPLATE_PARAMS = [TEMPLATE_WORK_DIR,TEMPLATE_IMG_EXTENSIONS,TEMPLATE_EXIFTOOL, TEMPLATE_META, TEMPLATE_OVERWRITE_KEYWORD, 
                        TEMPLATE_OVERWRITE_META, TEMPLATE_KEYWORD_HIER, TEMPLATE_TECH_KEYWORDS, TEMPLATE_COPYRIGHT, 
                        TEMPLATE_COPYRIGHT_NOTICE, TEMPLATE_CREDIT, TEMPLATE_SOURCE, TEMPLATE_TIMEZONE,
-                       TEMPLATE_CALIB_IMG, TEMPLATE_CALIB_DATETIME,TEMPLATE_GPX, TEMPLATE_DEFAULT_LATLON,TEMPLATE_CREATE_LATLON,
+                       TEMPLATE_CALIB_IMG, TEMPLATE_CALIB_DATETIME,TEMPLATE_CALIB_OFFSET,TEMPLATE_GPX, 
+                       TEMPLATE_DEFAULT_LATLON,TEMPLATE_CREATE_LATLON,
                        TEMPLATE_CREATE_DEFAULT_LATLON,TEMPLATE_DEFAULT_MAP_DETAIL]
+    
+    # mapping template values to meta data
+    TEMPLATE_META_MAP = {}
 
     @staticmethod
     def create_param_template(filepath="",name="",showinfo=True):
@@ -112,6 +116,12 @@ class Controller(object):
         tpl_dict["CALIB_IMG_FILE"] = "gps.jpg"
         tpl_dict["INFO_CALIB_DATETIME"] = "INFO: Enter Date Time displayed by your GPS image in Format with Quotes 'YYYY:MM:DD HH:MM:SS' "
         tpl_dict["CALIB_DATETIME"] = datetime.now().strftime("%Y:%m:%d %H:%M:%S")     
+        
+        tpl_dict["INFO_CALIB_OFFSET"]  = "INFO: Date Time Offset (instead of using calibration image and datetime info)"
+        tpl_dict["INFO_CALIB_OFFSET2"] = "      DATETIME_OFFSET = GPS_DATETIME - CAMERA_DATETIME"
+        tpl_dict["INFO_CALIB_OFFSET3"] = "      Image datetime and gps datetime will be ignored if this value is <> 0"
+        tpl_dict["CALIB_OFFSET"] = 0   
+
         tpl_dict["INFO_TIMEZONE"] = "INFO: Enter Time Zone (values as defined by pytz), default is 'Europe/Berlin'"
         tpl_dict["TIMEZONE"] = "Europe/Berlin"
         tpl_dict["INFO_GPX_FILE"] = "INFO: Filepath to your gpx file from your gps device"
@@ -316,9 +326,11 @@ class Controller(object):
         input_dict[Controller.TEMPLATE_DEFAULT_MAP_DETAIL]  = map_detail
         input_dict[Controller.TEMPLATE_CREATE_LATLON]  = template_dict.get(Controller.TEMPLATE_CREATE_LATLON,"C")
 
+        # direct input of datetime offset from file
+        input_dict[Controller.TEMPLATE_CALIB_OFFSET] = template_dict.get(Controller.TEMPLATE_CALIB_OFFSET,None)
 
         # calibration image file and date, calculate offset
-        if is_file(Controller.TEMPLATE_CALIB_IMG): 
+        if (is_file(Controller.TEMPLATE_CALIB_IMG)) and (input_dict[Controller.TEMPLATE_CALIB_OFFSET] is None): 
             f = template_dict.get((Controller.TEMPLATE_CALIB_IMG+"_FILE"))
             
             # gps time (as stored in template file / read from image)
@@ -336,8 +348,8 @@ class Controller(object):
                     dt_gps = Util.get_datetime_from_string(datetime_s=dt_gps_s,local_tz=tz,debug=False)
                     time_offset = Util.get_time_offset(time_camera=dt_img_s,time_gps=dt_gps_s,debug=False)
                     input_dict[Controller.TEMPLATE_CALIB_IMG]  = dt_img
-                    input_dict[Controller.TEMPLATE_CALIB_DATETIME]  = dt_gps
-                    input_dict[Controller.TEMPLATE_CALIB_OFFSET] = time_offset
+                    input_dict[Controller.TEMPLATE_CALIB_DATETIME]  = dt_gps                    
+                    input_dict[Controller.TEMPLATE_CALIB_OFFSET] = time_offset.total_seconds()
                 except:
                     input_dict[Controller.TEMPLATE_CALIB_IMG]  = None
                     input_dict[Controller.TEMPLATE_CALIB_DATETIME]  = None
@@ -398,19 +410,96 @@ class Controller(object):
         return input_dict        
     
     @staticmethod
+    def get_template_default_values()->dict:
+        """ get predefined template values """
+        template_default_values = {}
+        for template_value in Controller.TEMPLATE_PARAMS:
+            v = None
+            if template_value == Controller.TEMPLATE_IMG_EXTENSIONS:
+                v = ["jpg","jpeg"]
+            elif template_value == Controller.TEMPLATE_TIMEZONE:
+                v = "Europe/Berlin"
+            elif template_value == Controller.TEMPLATE_OVERWRITE_KEYWORD:
+                v = False
+            elif template_value == Controller.TEMPLATE_OVERWRITE_META:
+                v = False   
+            elif template_value == Controller.TEMPLATE_TECH_KEYWORDS:
+                v = True
+            elif template_value == Controller.TEMPLATE_COPYRIGHT:
+                v = "Unknown Artist"
+            elif template_value == Controller.TEMPLATE_COPYRIGHT_NOTICE:
+                v = "All rights reserved"
+            elif template_value == Controller.TEMPLATE_CREDIT:
+                v = "Unknown Artist"
+            elif template_value == Controller.TEMPLATE_SOURCE:
+                v = "Own Photography"            
+            elif template_value == Controller.TEMPLATE_CREATE_DEFAULT_LATLON:
+                v = True
+            elif template_value == Controller.TEMPLATE_DEFAULT_MAP_DETAIL:
+                v = 17
+            elif template_value == Controller.TEMPLATE_KEYWORD_HIER:
+                v = {}
+            elif template_value == Controller.TEMPLATE_CALIB_OFFSET:
+                v = 0
+            template_default_values[template_value] = v
+        return template_default_values
+
+    @staticmethod
+    def get_metadata_from_template(params:dict):
+        """ Creates IPTC metadata values from template """
+        template_metadata = {}
+
+        #  'META',
+        #  'COPYRIGHT',
+        #  'COPYRIGHT_NOTICE',
+        #  'CREDIT',
+        #  'SOURCE'
+
+        for template_value in params.keys():
+            pass
+
+        return template_metadata
+
+    @staticmethod
     def prepare_img_write(params:dict,show_info=False):
         """ blend template and metadata for each image file """
         
-# (['EXIFTOOL', 'WORK_DIR', 'IMG_EXTENSIONS', 'KEYWORD_HIER', 'META', 'OVERWRITE_KEYWORD', 'TIMEZONE', 
-# 'DEFAULT_MAP_DETAIL', 'CREATE_LATLON', 'CALIB_IMG', 'CALIB_DATETIME', 'CALIB_OFFSET', 'DEFAULT_LATLON', 
-# 'CREATE_DEFAULT_LATLON', 'DEFAULT_LATLON_FILE', 'DEFAULT_LATLON_FILE_ACTIONS', 'DEFAULT_REVERSE_GEO', 'GPX_FILE', 'GPX_FILE_ACTIONS', 'GPX'])
 
-        workdir = params.get("WORK_DIR",None)
-        exif_ref = params.get("EXIFTOOL",None)
-        ext = params.get("IMG_EXTENSIONS",["jpg","jpeg"])
-        gpx = params.get("GPX",None)
-        timezone = params.get("TIMEZONE","Europe/Berlin")
+    # TEMPLATE_PARAMS = [TEMPLATE_OVERWRITE_KEYWORD, 
+    #                    TEMPLATE_OVERWRITE_META, TEMPLATE_KEYWORD_HIER, TEMPLATE_TECH_KEYWORDS, TEMPLATE_COPYRIGHT, 
+    #                    TEMPLATE_COPYRIGHT_NOTICE, TEMPLATE_CREDIT, TEMPLATE_SOURCE, TEMPLATE_TIMEZONE,
+    #                    TEMPLATE_CALIB_IMG, TEMPLATE_CALIB_DATETIME,TEMPLATE_GPX, TEMPLATE_DEFAULT_LATLON,TEMPLATE_CREATE_LATLON,
+    #                    TEMPLATE_CREATE_DEFAULT_LATLON,TEMPLATE_DEFAULT_MAP_DETAIL]
         
+        # get default values from template / initialize
+        template_default_values = Controller.get_template_default_values()
+        augmented_params = {}
+        for k in template_default_values.keys():
+            if k in params:
+                v = params[k]
+            else:
+                v = template_default_values[k]
+            augmented_params[k] = v
+
+        workdir = augmented_params[Controller.TEMPLATE_WORK_DIR]
+        exif_ref = augmented_params[Controller.TEMPLATE_EXIFTOOL]
+        ext = augmented_params[Controller.TEMPLATE_IMG_EXTENSIONS]
+        gpx = augmented_params[Controller.TEMPLATE_GPX]
+        timezone = augmented_params[Controller.TEMPLATE_TIMEZONE]
+
+        # get default metadata from file / keys are IPTC attributes
+        default_meta = augmented_params[Controller.TEMPLATE_META]
+        overwrite_meta = augmented_params[Controller.TEMPLATE_OVERWRITE_META]
+        overwrite_keyword = augmented_params[Controller.TEMPLATE_OVERWRITE_KEYWORD]
+        keyword_hier = augmented_params[Controller.TEMPLATE_KEYWORD_HIER]
+        default_keywords = default_meta.get("Keywords",[])
+        write_tech_keywords = augmented_params[Controller.TEMPLATE_TECH_KEYWORDS]
+        
+        # gps data / calculate time offset (calculated in prepare_execution) 
+        gps_datetime_image = augmented_params[Controller.TEMPLATE_CALIB_IMG]
+        gps_datetime = augmented_params[Controller.TEMPLATE_CALIB_DATETIME]
+        gps_offset = augmented_params[Controller.TEMPLATE_CALIB_OFFSET]
+
         if not gpx is None:
             gpx_keys = sorted(gpx.keys())
         else:    
@@ -421,54 +510,58 @@ class Controller(object):
         if (workdir is None) or (exif_ref is None):
             print(f"Exiftool: {exif_ref} Work Dir: {workdir}, run can't be executed")
             return None
-        
+
         # read all metadata
         with ExifTool(exif_ref,debug=show_info) as exif:
             img_meta_list = exif.get_metadict_from_img(filenames=workdir,metafilter=metadata_filter,filetypes=ext)
+
+        if show_info:
+            if isinstance(img_meta_list,dict):
+                print(f"\n\n---- Number of images ({len(img_meta_list.keys())}) ----")
+            print(f"     GPS Datetime: {gps_datetime} GPS Datetime Image: {gps_datetime_image}  Offset: {gps_offset}s")
+            print(f"     Template Metadata {default_meta}")
+            print(f"     Overwrite existing keywords: {overwrite_keyword} Overwrite existing IPTC metadata: {overwrite_meta} Write Tech Keywords {write_tech_keywords}")
 
         for fileref,metadata_list in img_meta_list.items():
             creation_date = metadata_list.get("CreateDate",None)
             creation_timestamp = Util.get_localized_datetime(dt_in=creation_date,tz_in=timezone,tz_out="UTC",
                                                              debug=False,as_timestamp=True) 
+            if not ( creation_timestamp is None or gps_offset is None ):                                                 
+                creation_timestamp = int(creation_timestamp) + int(gps_offset)                                    
                                                             
             if isinstance(creation_timestamp,int):
                 creation_datetime = datetime.utcfromtimestamp(creation_timestamp)
             else:
                 creation_datetime = None
 
-            if show_info:
-                print(f"\n --- File {fileref} timestamp {creation_timestamp} UTC {creation_datetime} ---")
+            timestamp_index = None
+            timestamp_gpx = None
+            datetime_gpx = None
+            gpx_data = None            
+            timestamp_index = Util.get_nearby_index(creation_timestamp,sorted_list=gpx_keys,debug=False)            
+            
+            if timestamp_index != Util.NOT_FOUND:
+                timestamp_gpx = gpx_keys[timestamp_index]
+                datetime_gpx = datetime.utcfromtimestamp(timestamp_gpx)
+                gpx_data = gpx[timestamp_gpx]
 
-            #get metadata
-            #get technical metadata
+            # get technical keywords
+            tech_keywords = ExifTool.get_tech_keywords_from_metadict(metadata_list)
+
+            # get metadata from template and from file / augment metadata
+            keywords = []
+            file_keywords = metadata_list.get("Keywords",[])
+
+            if show_info:
+                print(f"\n --- File {fileref} \n          corrected timestamp {creation_timestamp} offset {gps_offset} corrected UTC {creation_datetime} ")
+                print(f"                GPS timestamp {timestamp_gpx} UTC {datetime_gpx} \n      GPS DATA:",gpx_data)     
+                print(f"      Tech Keywords {tech_keywords}")     
+                print(f"      Default Keywords: {default_keywords}")    
+                print(f"      File Keywords: {file_keywords}")     
+
             #get hierarchical metadata
             #copyright info
             #gps metadata
-            #read reverse geo info
-
-        
-# for img_meta_key,value in img_meta_list.items():
-#     cr_date = value.get('CreateDate',None)
-#     if cr_date is None:
-#         print(f"XXXX No Creation date for file {img_meta_key}")
-#         continue
-#     print(cr_date)
-#     #cr_date = (cr_date[:10].replace(":","-")+cr_date[10:]) # replace colons in date / TODO regex in handling routine
-#     dts = Util.get_localized_datetime(dt_in=cr_date,tz_in="Europe/Berlin",tz_out="Europe/Berlin",
-#                                      debug=False,as_timestamp=True) 
-#     print(f"Create Date {cr_date} (Europe/Berlin) UTC Timestamp {dts}")
-#     timestamp_index = None
-#     timestamp_index = Util.get_nearby_index(dts,sorted_list=gpx_keys,debug=False)
-#     if timestamp_index != Util.NOT_FOUND:
-#         ts_gpx = gpx_keys[timestamp_index]
-#         dt_gpx = datetime.datetime.utcfromtimestamp(ts_gpx)
-#         print(f"---GPS DATA AT TIMESTAMP {ts_gpx} UTC {dt_gpx} ---\n",gpx[ts_gpx])
-#     else:
-#         print(" Couldn't match GPS Data")
-#     for k,v in value.items():
-#         print(f"{k} -> {v}")
-    
-#     tech_keywords = ExifTool.get_tech_keywords_from_metadict(value)
-#     print("Tech Keywords",tech_keywords)        
+            #read reverse geo info     
 
         return None
