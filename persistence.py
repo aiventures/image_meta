@@ -153,9 +153,15 @@ class Persistence:
                     #    <ns3:hr>140</ns3:hr>  heart rate
                     #    <ns3:cad>83</ns3:cad> cadence / run frequency
                     extension = trackpoint.getElementsByTagNameNS('*','TrackPointExtension')
-                    if len(extension) == 1:                        
-                        heart_rate =  int(extension[0].getElementsByTagNameNS('*','hr')[0].firstChild.data)
-                        cadence = int(extension[0].getElementsByTagNameNS('*','cad')[0].firstChild.data)     
+                    if len(extension) == 1:                      
+                        try:  
+                            heart_rate =  int(extension[0].getElementsByTagNameNS('*','hr')[0].firstChild.data)
+                        except:
+                            heart_rate = 0
+                        try:
+                            cadence = int(extension[0].getElementsByTagNameNS('*','cad')[0].firstChild.data)     
+                        except:
+                            cadence = 0
                         gps_dict[ts]["heart_rate"] = heart_rate  
                         gps_dict[ts]["cadence"] = cadence       
                     
