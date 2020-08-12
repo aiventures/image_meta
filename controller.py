@@ -445,22 +445,6 @@ class Controller(object):
         return template_default_values
 
     @staticmethod
-    def get_metadata_from_template(params:dict):
-        """ Creates IPTC metadata values from template """
-        template_metadata = {}
-
-        #  'META',
-        #  'COPYRIGHT',
-        #  'COPYRIGHT_NOTICE',
-        #  'CREDIT',
-        #  'SOURCE'
-
-        for template_value in params.keys():
-            pass
-
-        return template_metadata
-
-    @staticmethod
     def prepare_img_write(params:dict,show_info=False):
         """ blend template and metadata for each image file """
         
@@ -473,6 +457,7 @@ class Controller(object):
         
         # get default values from template / initialize
         template_default_values = Controller.get_template_default_values()
+
         augmented_params = {}
         for k in template_default_values.keys():
             if k in params:
@@ -500,6 +485,19 @@ class Controller(object):
         gps_datetime = augmented_params[Controller.TEMPLATE_CALIB_DATETIME]
         gps_offset = augmented_params[Controller.TEMPLATE_CALIB_OFFSET]
 
+        # author and copyright info
+        copyright = augmented_params[Controller.TEMPLATE_COPYRIGHT]
+        copyright_notice = augmented_params[Controller.TEMPLATE_COPYRIGHT_NOTICE]
+        credit = augmented_params[Controller.TEMPLATE_CREDIT]
+        source = augmented_params[Controller.TEMPLATE_SOURCE]
+
+        # copy default values for metadata (can be either in template or in metadata template)
+        default_iptc = {}
+        default_iptc["Copyright"] = {"template":copyright,"meta":default_meta.get('Copyright',None) }
+        default_iptc["CopyrightNotice"] = {"template":copyright_notice,"meta":default_meta.get('CopyrightNotice',None) }
+        default_iptc["Credit"] = {"template":credit,"meta":default_meta.get('Credit',None) }
+        default_iptc["Source"] = {"template":source,"meta":default_meta.get('Source',None) }
+
         if not gpx is None:
             gpx_keys = sorted(gpx.keys())
         else:    
@@ -511,16 +509,22 @@ class Controller(object):
             print(f"Exiftool: {exif_ref} Work Dir: {workdir}, run can't be executed")
             return None
 
+
+        if show_info:
+            print(f"\n\n###### READING IMAGES in {workdir} ######")
+        
         # read all metadata
         with ExifTool(exif_ref,debug=show_info) as exif:
             img_meta_list = exif.get_metadict_from_img(filenames=workdir,metafilter=metadata_filter,filetypes=ext)
 
         if show_info:
             if isinstance(img_meta_list,dict):
-                print(f"\n\n---- Number of images ({len(img_meta_list.keys())}) ----")
+                print(f"\n\n###### Number of images ({len(img_meta_list.keys())}) ######")
             print(f"     GPS Datetime: {gps_datetime} GPS Datetime Image: {gps_datetime_image}  Offset: {gps_offset}s")
             print(f"     Template Metadata {default_meta}")
             print(f"     Overwrite existing keywords: {overwrite_keyword} Overwrite existing IPTC metadata: {overwrite_meta} Write Tech Keywords {write_tech_keywords}")
+            print(f"     COPYRIGHT INFO {copyright} notice {copyright_notice} credit {credit} source {source}")
+
 
         for fileref,metadata_list in img_meta_list.items():
             creation_date = metadata_list.get("CreateDate",None)
@@ -548,20 +552,43 @@ class Controller(object):
             # get technical keywords
             tech_keywords = ExifTool.get_tech_keywords_from_metadict(metadata_list)
 
-            # get metadata from template and from file / augment metadata
             keywords = []
-            file_keywords = metadata_list.get("Keywords",[])
+            hier_keywords = []
 
+            file_keywords = metadata_list.get("Keywords",[])
+            if not overwrite_keyword:
+                keywords = [*keywords,*file_keywords]
+
+            keywords = [*keywords,*default_keywords]
+
+            # get metadata from template and from file / augment metadata
+            if write_tech_keywords:
+                keywords = [*keywords,*tech_keywords] 
+            
+            # remove duplicates
+            keywords = list(dict.fromkeys(keywords).keys())
+
+            #get hierarchical metadata
+            for keyword in keywords:
+                hier_keyword = keyword_hier.get(keyword,None)
+                if hier_keyword is not None:
+                    hier_keywords.append(hier_keyword)
+
+            #copyright info
+
+            
+            #gps metadata
+            #read reverse geo info     
+
+                    
             if show_info:
                 print(f"\n --- File {fileref} \n          corrected timestamp {creation_timestamp} offset {gps_offset} corrected UTC {creation_datetime} ")
                 print(f"                GPS timestamp {timestamp_gpx} UTC {datetime_gpx} \n      GPS DATA:",gpx_data)     
                 print(f"      Tech Keywords {tech_keywords}")     
                 print(f"      Default Keywords: {default_keywords}")    
                 print(f"      File Keywords: {file_keywords}")     
+                print(f"      All Keywords:  {keywords}")   
+                print(f"      Hierarchy Keywords:  {hier_keywords}")   
 
-            #get hierarchical metadata
-            #copyright info
-            #gps metadata
-            #read reverse geo info     
 
         return None
