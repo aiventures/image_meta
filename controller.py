@@ -445,6 +445,46 @@ class Controller(object):
         return template_default_values
 
     @staticmethod
+    def augment_meta_data(metadata_list:list,metadata_default_dict:dict,metadata:dict,overwrite_meta=False)->dict:
+        """ select the metadata value either from file, template or metadata template """
+        
+        augmented_meta = {}
+
+        for metadata_key in metadata_list:
+            
+            metadata_default = metadata_default_dict.get(metadata_key,None)
+            if ( not isinstance(metadata_default,dict) ):
+                continue
+            
+            metavalue_file = metadata.get(metadata_key,None)
+            metavalue_template = metadata_default.get("template",None)
+            metavalue_default = metadata_default.get("meta",None)
+            
+            # get values
+            metavalue = None            
+            
+            # set default values metadata value in template file is prioritized over default metadata value
+            if metadata_default_dict is not None:
+                metavalue = metadata_default_dict
+            if metavalue_template is not None:
+                metavalue = metavalue_template
+            
+            if not ( metavalue_file is None or metavalue is None): # metadata existent
+                if not overwrite_meta: # do not overwrite with template value
+                    metavalue = None
+
+            # set the new meta value
+            if not metavalue is None:
+                augmented_meta[metadata_key] = metavalue
+
+        return augmented_meta
+
+    @staticmethod
+    def augment_gps_data():
+        """ blend default and gps data """
+        return None
+
+    @staticmethod
     def prepare_img_write(params:dict,show_info=False):
         """ blend template and metadata for each image file """
         
@@ -485,18 +525,35 @@ class Controller(object):
         gps_datetime = augmented_params[Controller.TEMPLATE_CALIB_DATETIME]
         gps_offset = augmented_params[Controller.TEMPLATE_CALIB_OFFSET]
 
+        # default latlon coordinates
+        gpx_default_latlon = augmented_params[Controller.TEMPLATE_DEFAULT_LATLON]
+        # create default latlon file / default latlon files  if not present
+        gpx_create_default_latlon = augmented_params[Controller.TEMPLATE_CREATE_DEFAULT_LATLON]
+        gpx_create_latlon = augmented_params[Controller.TEMPLATE_CREATE_LATLON]
+#         gpx_default_latlon = augmented_params[Controller.TEMPLATE_CALIB_IMG]
+#         tpl_dict["INFO_CREATE_LATLON"] = "Create LATLON FILE, values (0:ignore, C:create, R:read , U:update)"
+#         tpl_dict["CREATE_LATLON"] = Persistence.MODE_CREATE     
+#         tpl_dict["INFO_CREATE_DEFAULT_LATLON"] = "Create Default LATLON FILE, values (0:ignore, C:create, R:read , U:update)"
+#         tpl_dict["CREATE_DEFAULT_LATLON"] = Persistence.MODE_CREATE            
+#         tpl_dict["INFO_DEFAULT_LATLON_FILE"] = "DEFAULT LAT LON FILE PATH for Default Geocoordinates if they can't be found"
+#         tpl_dict["DEFAULT_LATLON_FILE"] = "default.gps"          
+#         tpl_dict["INFO_DEFAULT_MAP_DETAIL"] = "DEFAULT Detail level for map links (1...18)"
+#         tpl_dict["DEFAULT_MAP_DETAIL"] = 18             
+# TEMPLATE_DEFAULT_LATLON,TEMPLATE_CREATE_LATLON,
+    #                    TEMPLATE_CREATE_DEFAULT_LATLON,TEMPLATE_DEFAULT_MAP_DETAIL
+
         # author and copyright info
-        copyright = augmented_params[Controller.TEMPLATE_COPYRIGHT]
-        copyright_notice = augmented_params[Controller.TEMPLATE_COPYRIGHT_NOTICE]
-        credit = augmented_params[Controller.TEMPLATE_CREDIT]
-        source = augmented_params[Controller.TEMPLATE_SOURCE]
+        copyright_template = augmented_params[Controller.TEMPLATE_COPYRIGHT]
+        copyright_notice_template = augmented_params[Controller.TEMPLATE_COPYRIGHT_NOTICE]
+        credit_template = augmented_params[Controller.TEMPLATE_CREDIT]
+        source_template = augmented_params[Controller.TEMPLATE_SOURCE]
 
         # copy default values for metadata (can be either in template or in metadata template)
         default_iptc = {}
-        default_iptc["Copyright"] = {"template":copyright,"meta":default_meta.get('Copyright',None) }
-        default_iptc["CopyrightNotice"] = {"template":copyright_notice,"meta":default_meta.get('CopyrightNotice',None) }
-        default_iptc["Credit"] = {"template":credit,"meta":default_meta.get('Credit',None) }
-        default_iptc["Source"] = {"template":source,"meta":default_meta.get('Source',None) }
+        default_iptc["Copyright"] = {"template":copyright_template,"meta":default_meta.get('Copyright',None) }
+        default_iptc["CopyrightNotice"] = {"template":copyright_notice_template,"meta":default_meta.get('CopyrightNotice',None) }
+        default_iptc["Credit"] = {"template":credit_template,"meta":default_meta.get('Credit',None) }
+        default_iptc["Source"] = {"template":source_template,"meta":default_meta.get('Source',None) }
 
         if not gpx is None:
             gpx_keys = sorted(gpx.keys())
@@ -508,7 +565,6 @@ class Controller(object):
         if (workdir is None) or (exif_ref is None):
             print(f"Exiftool: {exif_ref} Work Dir: {workdir}, run can't be executed")
             return None
-
 
         if show_info:
             print(f"\n\n###### READING IMAGES in {workdir} ######")
@@ -523,11 +579,11 @@ class Controller(object):
             print(f"     GPS Datetime: {gps_datetime} GPS Datetime Image: {gps_datetime_image}  Offset: {gps_offset}s")
             print(f"     Template Metadata {default_meta}")
             print(f"     Overwrite existing keywords: {overwrite_keyword} Overwrite existing IPTC metadata: {overwrite_meta} Write Tech Keywords {write_tech_keywords}")
-            print(f"     COPYRIGHT INFO {copyright} notice {copyright_notice} credit {credit} source {source}")
+            print(f"     COPYRIGHT INFO {copyright_template} notice {copyright_notice_template} credit {credit_template} source {source_template}")
 
 
-        for fileref,metadata_list in img_meta_list.items():
-            creation_date = metadata_list.get("CreateDate",None)
+        for fileref,metadata_dict in img_meta_list.items():
+            creation_date = metadata_dict.get("CreateDate",None)
             creation_timestamp = Util.get_localized_datetime(dt_in=creation_date,tz_in=timezone,tz_out="UTC",
                                                              debug=False,as_timestamp=True) 
             if not ( creation_timestamp is None or gps_offset is None ):                                                 
@@ -550,12 +606,12 @@ class Controller(object):
                 gpx_data = gpx[timestamp_gpx]
 
             # get technical keywords
-            tech_keywords = ExifTool.get_tech_keywords_from_metadict(metadata_list)
+            tech_keywords = ExifTool.get_tech_keywords_from_metadict(metadata_dict)
 
             keywords = []
             hier_keywords = []
 
-            file_keywords = metadata_list.get("Keywords",[])
+            file_keywords = metadata_dict.get("Keywords",[])
             if not overwrite_keyword:
                 keywords = [*keywords,*file_keywords]
 
@@ -574,10 +630,14 @@ class Controller(object):
                 if hier_keyword is not None:
                     hier_keywords.append(hier_keyword)
 
-            #copyright info
+            # augment copyright info
+            copyright_meta = ["Copyright","CopyrightNotice","Credit","Source"]
 
-            
-            #gps metadata
+            augmented_meta = Controller.augment_meta_data(metadata_list=copyright_meta,metadata_default_dict=default_iptc,
+                                                         metadata=metadata_dict,overwrite_meta=overwrite_meta)
+
+            # gps metadata
+
             #read reverse geo info     
 
                     
@@ -589,6 +649,7 @@ class Controller(object):
                 print(f"      File Keywords: {file_keywords}")     
                 print(f"      All Keywords:  {keywords}")   
                 print(f"      Hierarchy Keywords:  {hier_keywords}")   
+                print(f"      Other Metadata:      {augmented_meta}") 
 
 
         return None
