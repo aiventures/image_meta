@@ -38,23 +38,30 @@ class Controller(object):
 
     # Geocoordinate Handling
     TEMPLATE_TIMEZONE = "TIMEZONE"
+    TEMPLATE_CREATE_GEO_METADATA = "CREATE_GEO_METADATA"
     TEMPLATE_CALIB_IMG = "CALIB_IMG"
     TEMPLATE_CALIB_DATETIME = "CALIB_DATETIME"
     TEMPLATE_CALIB_OFFSET = "CALIB_OFFSET"
     TEMPLATE_GPX = "GPX"
+    TEMPLATE_GPX_FILE = "GPX_FILE"
+    TEMPLATE_GPX_FILE = "GPX_FILE_ACTIONS"
     TEMPLATE_DEFAULT_LATLON = "DEFAULT_LATLON"
+    TEMPLATE_DEFAULT_LATLON_FILE = "DEFAULT_LATLON_FILE"
+    TEMPLATE_DEFAULT_LATLON_FILE_ACTIONS = "DEFAULT_LATLON_FILE_ACTIONS"
     TEMPLATE_CREATE_LATLON = "CREATE_LATLON"    
     TEMPLATE_CREATE_DEFAULT_LATLON = "CREATE_DEFAULT_LATLON"  
     TEMPLATE_DEFAULT_MAP_DETAIL = "DEFAULT_MAP_DETAIL"
     TEMPLATE_DEFAULT_REVERSE_GEO = "DEFAULT_REVERSE_GEO"
-
+    TEMPLATE_DEFAULT_GPS_EXT = "DEFAULT_GPS_EXT"   
 
     TEMPLATE_PARAMS = [TEMPLATE_WORK_DIR,TEMPLATE_IMG_EXTENSIONS,TEMPLATE_EXIFTOOL, TEMPLATE_META, TEMPLATE_OVERWRITE_KEYWORD, 
                        TEMPLATE_OVERWRITE_META, TEMPLATE_KEYWORD_HIER, TEMPLATE_TECH_KEYWORDS, TEMPLATE_COPYRIGHT, 
                        TEMPLATE_COPYRIGHT_NOTICE, TEMPLATE_CREDIT, TEMPLATE_SOURCE, TEMPLATE_TIMEZONE,
+                       TEMPLATE_CREATE_GEO_METADATA,
                        TEMPLATE_CALIB_IMG, TEMPLATE_CALIB_DATETIME,TEMPLATE_CALIB_OFFSET,TEMPLATE_GPX, 
                        TEMPLATE_DEFAULT_LATLON,TEMPLATE_CREATE_LATLON,
-                       TEMPLATE_CREATE_DEFAULT_LATLON,TEMPLATE_DEFAULT_MAP_DETAIL]
+                       TEMPLATE_CREATE_DEFAULT_LATLON,TEMPLATE_DEFAULT_MAP_DETAIL,
+                       TEMPLATE_DEFAULT_REVERSE_GEO,TEMPLATE_DEFAULT_GPS_EXT]
     
     # mapping template values to meta data
     TEMPLATE_META_MAP = {}
@@ -112,6 +119,8 @@ class Controller(object):
         tpl_dict["SOURCE"] = "AUTHOR"  
         
         # Geo Coordinate Handling / 
+        tpl_dict["INFO_CREATE_GEO_METADATA"] = "INFO: Create Geo Metadata"
+        tpl_dict["CREATE_GEO_METADATA"] = True
         tpl_dict["INFO_CALIB_IMG_FILE"] = "INFO: image displaying time of your GPS "
         tpl_dict["CALIB_IMG_FILE"] = "gps.jpg"
         tpl_dict["INFO_CALIB_DATETIME"] = "INFO: Enter Date Time displayed by your GPS image in Format with Quotes 'YYYY:MM:DD HH:MM:SS' "
@@ -132,10 +141,12 @@ class Controller(object):
         tpl_dict["CREATE_LATLON"] = Persistence.MODE_CREATE     
         tpl_dict["INFO_CREATE_DEFAULT_LATLON"] = "Create Default LATLON FILE, values (0:ignore, C:create, R:read , U:update)"
         tpl_dict["CREATE_DEFAULT_LATLON"] = Persistence.MODE_CREATE            
-        tpl_dict["INFO_DEFAULT_LATLON_FILE"] = "DEFAULT LAT LON FILE PATH for Default Geocoordinates if they can't be found"
-        tpl_dict["DEFAULT_LATLON_FILE"] = "default.gps"          
+        tpl_dict["INFO_DEFAULT_LATLON_FILE"] = "DEFAULT LAT LON FILE PATH for Default Geocoordinates if they can't be found for single image"
+        tpl_dict["DEFAULT_LATLON_FILE"] = "default.geo"          
         tpl_dict["INFO_DEFAULT_MAP_DETAIL"] = "DEFAULT Detail level for map links (1...18)"
         tpl_dict["DEFAULT_MAP_DETAIL"] = 18     
+        tpl_dict["INFO_DEFAULT_GPS_EXT"] = "DEFAULT GPS File Extension"
+        tpl_dict["DEFAULT_GPS_EXT"] = "geo"             
 
         if not showinfo:
             keys = list(tpl_dict.keys())
@@ -320,6 +331,7 @@ class Controller(object):
 
         # copy single template parameters with default values
         input_dict[Controller.TEMPLATE_OVERWRITE_KEYWORD]  = template_dict.get(Controller.TEMPLATE_OVERWRITE_KEYWORD,False)
+        input_dict[Controller.TEMPLATE_OVERWRITE_META]  = template_dict.get(Controller.TEMPLATE_OVERWRITE_META,False)
         tz = template_dict.get(Controller.TEMPLATE_TIMEZONE,"Europe/Berlin")
         input_dict[Controller.TEMPLATE_TIMEZONE] = tz
         map_detail = template_dict.get(Controller.TEMPLATE_DEFAULT_MAP_DETAIL,18)
@@ -404,10 +416,22 @@ class Controller(object):
             input_dict[ka] = template_dict.get(ka,"")
             gpx_data = Persistence.read_gpx(gpsx_path=f,debug=showinfo,tz=pytz.timezone(tz))
             input_dict[Controller.TEMPLATE_GPX] = gpx_data
-        
-        Util.print_dict_info(d=input_dict,show_info=showinfo,list_elems=3)
 
-        return input_dict        
+        # get default values from template / initialize
+        template_default_values = Controller.get_template_default_values()
+
+        augmented_params = {}
+
+        for k in template_default_values.keys():
+            if k in input_dict:
+                v = input_dict[k]
+            else:
+                v = template_default_values[k]
+            augmented_params[k] = v
+
+        Util.print_dict_info(d=augmented_params,show_info=showinfo,list_elems=3)        
+
+        return augmented_params
     
     @staticmethod
     def get_template_default_values()->dict:
@@ -441,6 +465,10 @@ class Controller(object):
                 v = {}
             elif template_value == Controller.TEMPLATE_CALIB_OFFSET:
                 v = 0
+            elif template_value == Controller.TEMPLATE_DEFAULT_GPS_EXT:
+                v = "geo"
+            elif template_value == Controller.TEMPLATE_CREATE_GEO_METADATA:
+                v = True
             template_default_values[template_value] = v
         return template_default_values
 
@@ -448,6 +476,10 @@ class Controller(object):
     def augment_meta_data(metadata_list:list,metadata_default_dict:dict,metadata:dict,overwrite_meta=False)->dict:
         """ select the metadata value either from file, template or metadata template """
         
+        # todo
+        # metadata_default_dict > template meta data 
+        # metadata > from file / will be left as is / nothing required / shown here only for debugging
+
         augmented_meta = {}
 
         for metadata_key in metadata_list:
@@ -480,73 +512,137 @@ class Controller(object):
         return augmented_meta
 
     @staticmethod
-    def augment_gps_data():
+    def augment_gps_data(fileref:str,geo_dict:dict,template_dict:dict,metadata_dict:dict):
         """ blend default and gps data """
+
+        # geo metadata handling deactivated
+        if not ( template_dict.get(Controller.TEMPLATE_CREATE_GEO_METADATA,False) ):
+            return metadata_dict
+
+        # check if gps metadata are already stored in metadata and still need to be processed 
+        lat_ref = metadata_dict.get("GPSLatitudeRef",None)
+        lon_ref = metadata_dict.get("GPSLongitudeRef",None)
+        lat = metadata_dict.get("GPSLatitude",None)
+        lon = metadata_dict.get("GPSLongitude",None)
+        gps_metadata_exist = True
+
+        if ( ( lat_ref is None ) or ( lon_ref is None ) or ( lat is None ) or ( lon is None ) ):
+             gps_metadata_exist = False       
+
+        overwrite_meta = template_dict.get(Controller.TEMPLATE_OVERWRITE_META,False)
+
+        if ( overwrite_meta is False ) and ( gps_metadata_exist is True ) :
+            return metadata_dict
+
+        # get default reverse Geo Data
+        default_reverse_geo = template_dict.get(Controller.TEMPLATE_DEFAULT_REVERSE_GEO,None)
+
+        # get the geo filepath / check if file exists already
+        file_info = Persistence.get_filepath_info(fileref)
+        filepath = file_info.get(Persistence.FILEINFO_FILEPATH,None)
+        file_suffix_len = len(file_info.get(Persistence.FILEINFO_SUFFIX))
+        
+        geo_suffix = template_dict.get(Controller.TEMPLATE_DEFAULT_GPS_EXT,"geo")
+        filepath_geo = filepath[:-file_suffix_len]+geo_suffix
+        file_info_geo = Persistence.get_filepath_info(filepath_geo)
+        geo_exists = file_info_geo.get(Persistence.FILEINFO_EXISTS,False) 
+        geo_file_actions = file_info_geo.get(Persistence.FILEINFO_ACTIONS)
+        create_latlon_file = template_dict.get(Controller.TEMPLATE_CREATE_LATLON,Persistence.MODE_IGNORE) 
+        latlon = None
+        geo_detail_level = template_dict.get(Controller.TEMPLATE_DEFAULT_MAP_DETAIL,18) 
+        
+        # get lat lon data
+        try:
+            latlon = [geo_dict["lat"],geo_dict["lon"]]
+        except:
+            latlon = None
+        
+        if create_latlon_file in Persistence.ACTIONS_CHANGE_FILE:
+            save_latlon = True
+        else:
+            save_latlon = False
+    
+
+
+        # retrieve_nominatim_reverse
+
+        #print("INFOXXXXXXX",Persistence.get_filepath_info(fileref))
+        #print(f"###FILEINFO### {filepath_geo} exist {geo_exists} actions {geo_file_actions} create lat lon file {create_latlon_file}")
+        # check for existence / filepath / suffix / suffix for gos 
+        #print("DEFAULT REVERSE",default_reverse_geo)
+        # check for specific gps data
+        # check for default gps data 
+#'filepath': 'C:\\30_Entwicklung\\MachineLearningInfos\\2020_MachineLearning\\20200209_EXIF_IPTC_Tags\\img\\A6500.jpg', 
+#'parts': ['C:\\', '30_Entwicklung', 'MachineLearningInfos', '2020_MachineLearning', '20200209_EXIF_IPTC_Tags', 
+#'img', 'A6500.jpg'], 'parent': 'C:\\30_Entwicklung\\MachineLearningInfos\\2020_MachineLearning\\20200209_EXIF_IPTC_Tags\\img', 'stem': 'A6500', 'drive': 'C:', 'is_absolute_path': True, 'suffix': 'jpg',
+#            DEFAULT_LATLON  ->  [49.01304, 8.40433]
+#    CREATE_DEFAULT_LATLON  ->   R
+#    DEFAULT_LATLON_FILE  ->   C:\30_Entwicklung\MachineLearningInfos\2020_MachineLearning\20200209_EXIF_IPTC_Tags\img\defaultlatelon.txt
+#    DEFAULT_LATLON_FILE_ACTIONS  ->   XRUD
+# TEMPLATE_DEFAULT_LATLON = "DEFAULT_LATLON"+"_FILE_ACTIONS"
+
+        # Geo Coordinate Handling / 
+        # tpl_dict["INFO_CALIB_IMG_FILE"] = "INFO: image displaying time of your GPS "
+        # tpl_dict["CALIB_IMG_FILE"] = "gps.jpg"
+        # tpl_dict["INFO_CALIB_DATETIME"] = "INFO: Enter Date Time displayed by your GPS image in Format with Quotes 'YYYY:MM:DD HH:MM:SS' "
+        # tpl_dict["CALIB_DATETIME"] = datetime.now().strftime("%Y:%m:%d %H:%M:%S")     
+        
+        # tpl_dict["INFO_CALIB_OFFSET"]  = "INFO: Date Time Offset (instead of using calibration image and datetime info)"
+        # tpl_dict["INFO_CALIB_OFFSET2"] = "      DATETIME_OFFSET = GPS_DATETIME - CAMERA_DATETIME"
+        # tpl_dict["INFO_CALIB_OFFSET3"] = "      Image datetime and gps datetime will be ignored if this value is <> 0"
+        # tpl_dict["CALIB_OFFSET"] = 0   
+
+        # tpl_dict["INFO_TIMEZONE"] = "INFO: Enter Time Zone (values as defined by pytz), default is 'Europe/Berlin'"
+        # tpl_dict["TIMEZONE"] = "Europe/Berlin"
+        # tpl_dict["INFO_GPX_FILE"] = "INFO: Filepath to your gpx file from your gps device"
+        # tpl_dict["GPX_FILE"] = "geo.gpx"       
+        # tpl_dict["INFO_DEFAULT_LATLON"] = "DEFAULT LAT LON COORDINATES if Geocoordinates or GPX Data can't be found"
+        # tpl_dict["DEFAULT_LATLON"] = (49.01304,8.40433)  
+        # tpl_dict["INFO_CREATE_LATLON"] = "Create LATLON FILE, values (0:ignore, C:create, R:read , U:update)"
+        # tpl_dict["CREATE_LATLON"] = Persistence.MODE_CREATE     
+        # tpl_dict["INFO_CREATE_DEFAULT_LATLON"] = "Create Default LATLON FILE, values (0:ignore, C:create, R:read , U:update)"
+        # tpl_dict["CREATE_DEFAULT_LATLON"] = Persistence.MODE_CREATE            
+        # tpl_dict["INFO_DEFAULT_LATLON_FILE"] = "DEFAULT LAT LON FILE PATH for Default Geocoordinates if they can't be found"
+        # tpl_dict["DEFAULT_LATLON_FILE"] = "default.gps"          
+        # tpl_dict["INFO_DEFAULT_MAP_DETAIL"] = "DEF        
+        # 'DEFAULT_LATLON_FILE': 'C:\\30_Entwicklung\\MachineLearningInfos\\2020_MachineLearning\\20200209_EXIF_IPTC_Tags\\img\\defaultlatelon.txt',
+        # 'DEFAULT_LATLON_FILE_ACTIONS': 'XRUD',
         return None
 
     @staticmethod
     def prepare_img_write(params:dict,show_info=False):
         """ blend template and metadata for each image file """
-        
 
     # TEMPLATE_PARAMS = [TEMPLATE_OVERWRITE_KEYWORD, 
     #                    TEMPLATE_OVERWRITE_META, TEMPLATE_KEYWORD_HIER, TEMPLATE_TECH_KEYWORDS, TEMPLATE_COPYRIGHT, 
     #                    TEMPLATE_COPYRIGHT_NOTICE, TEMPLATE_CREDIT, TEMPLATE_SOURCE, TEMPLATE_TIMEZONE,
     #                    TEMPLATE_CALIB_IMG, TEMPLATE_CALIB_DATETIME,TEMPLATE_GPX, TEMPLATE_DEFAULT_LATLON,TEMPLATE_CREATE_LATLON,
-    #                    TEMPLATE_CREATE_DEFAULT_LATLON,TEMPLATE_DEFAULT_MAP_DETAIL]
-        
-        # get default values from template / initialize
-        template_default_values = Controller.get_template_default_values()
-
-        augmented_params = {}
-        for k in template_default_values.keys():
-            if k in params:
-                v = params[k]
-            else:
-                v = template_default_values[k]
-            augmented_params[k] = v
-
-        workdir = augmented_params[Controller.TEMPLATE_WORK_DIR]
-        exif_ref = augmented_params[Controller.TEMPLATE_EXIFTOOL]
-        ext = augmented_params[Controller.TEMPLATE_IMG_EXTENSIONS]
-        gpx = augmented_params[Controller.TEMPLATE_GPX]
-        timezone = augmented_params[Controller.TEMPLATE_TIMEZONE]
-
-        # get default metadata from file / keys are IPTC attributes
-        default_meta = augmented_params[Controller.TEMPLATE_META]
-        overwrite_meta = augmented_params[Controller.TEMPLATE_OVERWRITE_META]
-        overwrite_keyword = augmented_params[Controller.TEMPLATE_OVERWRITE_KEYWORD]
-        keyword_hier = augmented_params[Controller.TEMPLATE_KEYWORD_HIER]
-        default_keywords = default_meta.get("Keywords",[])
-        write_tech_keywords = augmented_params[Controller.TEMPLATE_TECH_KEYWORDS]
-        
-        # gps data / calculate time offset (calculated in prepare_execution) 
-        gps_datetime_image = augmented_params[Controller.TEMPLATE_CALIB_IMG]
-        gps_datetime = augmented_params[Controller.TEMPLATE_CALIB_DATETIME]
-        gps_offset = augmented_params[Controller.TEMPLATE_CALIB_OFFSET]
-
-        # default latlon coordinates
-        gpx_default_latlon = augmented_params[Controller.TEMPLATE_DEFAULT_LATLON]
-        # create default latlon file / default latlon files  if not present
-        gpx_create_default_latlon = augmented_params[Controller.TEMPLATE_CREATE_DEFAULT_LATLON]
-        gpx_create_latlon = augmented_params[Controller.TEMPLATE_CREATE_LATLON]
-#         gpx_default_latlon = augmented_params[Controller.TEMPLATE_CALIB_IMG]
-#         tpl_dict["INFO_CREATE_LATLON"] = "Create LATLON FILE, values (0:ignore, C:create, R:read , U:update)"
-#         tpl_dict["CREATE_LATLON"] = Persistence.MODE_CREATE     
-#         tpl_dict["INFO_CREATE_DEFAULT_LATLON"] = "Create Default LATLON FILE, values (0:ignore, C:create, R:read , U:update)"
-#         tpl_dict["CREATE_DEFAULT_LATLON"] = Persistence.MODE_CREATE            
-#         tpl_dict["INFO_DEFAULT_LATLON_FILE"] = "DEFAULT LAT LON FILE PATH for Default Geocoordinates if they can't be found"
-#         tpl_dict["DEFAULT_LATLON_FILE"] = "default.gps"          
-#         tpl_dict["INFO_DEFAULT_MAP_DETAIL"] = "DEFAULT Detail level for map links (1...18)"
-#         tpl_dict["DEFAULT_MAP_DETAIL"] = 18             
-# TEMPLATE_DEFAULT_LATLON,TEMPLATE_CREATE_LATLON,
     #                    TEMPLATE_CREATE_DEFAULT_LATLON,TEMPLATE_DEFAULT_MAP_DETAIL
 
+        workdir = params[Controller.TEMPLATE_WORK_DIR]
+        exif_ref = params[Controller.TEMPLATE_EXIFTOOL]
+        ext = params[Controller.TEMPLATE_IMG_EXTENSIONS]
+        gpx = params[Controller.TEMPLATE_GPX]
+        timezone = params[Controller.TEMPLATE_TIMEZONE]
+
+        # get default metadata from file / keys are IPTC attributes
+        default_meta = params[Controller.TEMPLATE_META]
+        overwrite_meta = params[Controller.TEMPLATE_OVERWRITE_META]
+        overwrite_keyword = params[Controller.TEMPLATE_OVERWRITE_KEYWORD]
+        keyword_hier = params[Controller.TEMPLATE_KEYWORD_HIER]
+        default_keywords = default_meta.get("Keywords",[])
+        write_tech_keywords = params[Controller.TEMPLATE_TECH_KEYWORDS]
+        
+        # gps data / calculate time offset (calculated in prepare_execution) 
+        gps_datetime_image = params[Controller.TEMPLATE_CALIB_IMG]
+        gps_datetime = params[Controller.TEMPLATE_CALIB_DATETIME]
+        gps_offset = params[Controller.TEMPLATE_CALIB_OFFSET]
+
         # author and copyright info
-        copyright_template = augmented_params[Controller.TEMPLATE_COPYRIGHT]
-        copyright_notice_template = augmented_params[Controller.TEMPLATE_COPYRIGHT_NOTICE]
-        credit_template = augmented_params[Controller.TEMPLATE_CREDIT]
-        source_template = augmented_params[Controller.TEMPLATE_SOURCE]
+        copyright_template = params[Controller.TEMPLATE_COPYRIGHT]
+        copyright_notice_template = params[Controller.TEMPLATE_COPYRIGHT_NOTICE]
+        credit_template = params[Controller.TEMPLATE_CREDIT]
+        source_template = params[Controller.TEMPLATE_SOURCE]
 
         # copy default values for metadata (can be either in template or in metadata template)
         default_iptc = {}
@@ -597,13 +693,13 @@ class Controller(object):
             timestamp_index = None
             timestamp_gpx = None
             datetime_gpx = None
-            gpx_data = None            
+            geo_data = None            
             timestamp_index = Util.get_nearby_index(creation_timestamp,sorted_list=gpx_keys,debug=False)            
             
             if timestamp_index != Util.NOT_FOUND:
                 timestamp_gpx = gpx_keys[timestamp_index]
                 datetime_gpx = datetime.utcfromtimestamp(timestamp_gpx)
-                gpx_data = gpx[timestamp_gpx]
+                geo_data = gpx[timestamp_gpx]
 
             # get technical keywords
             tech_keywords = ExifTool.get_tech_keywords_from_metadict(metadata_dict)
@@ -637,13 +733,14 @@ class Controller(object):
                                                          metadata=metadata_dict,overwrite_meta=overwrite_meta)
 
             # gps metadata
-
+            gps_data = Controller.augment_gps_data(fileref=fileref,geo_dict=geo_data,template_dict=params,metadata_dict=metadata_dict)
+            #def augment_gps_data(gpx_dict:dict,template_dict:dict,metadata_dict:dict):
             #read reverse geo info     
 
                     
             if show_info:
                 print(f"\n --- File {fileref} \n          corrected timestamp {creation_timestamp} offset {gps_offset} corrected UTC {creation_datetime} ")
-                print(f"                GPS timestamp {timestamp_gpx} UTC {datetime_gpx} \n      GPS DATA:",gpx_data)     
+                print(f"                GPS timestamp {timestamp_gpx} UTC {datetime_gpx} \n      GPS DATA:",geo_data)     
                 print(f"      Tech Keywords {tech_keywords}")     
                 print(f"      Default Keywords: {default_keywords}")    
                 print(f"      File Keywords: {file_keywords}")     
