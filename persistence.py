@@ -30,10 +30,28 @@ class Persistence:
     MODE_DELETE = "D"
     MODE_CREATE_UPDATE = "X"
     MODE_TXT = { "0":"MODE IGNORE", "R":"MODE READ","U":"MODE UPDATE","C":"MODE CREATE","D":"MODE DELETE","X":"MODE CREATE UPDATE"}
+    
     # allowed file actions
     ACTIONS_NEW_FILE = "XC"
     ACTIONS_FILE = "XRUD"
     ACTIONS_CHANGE_FILE = "XUDC"
+
+    # file parts
+    FILEINFO_FILEPATH = "filepath" 
+    FILEINFO_PARTS = "parts"
+    FILEINFO_PARENT = "parent"
+    FILEINFO_EXISTING_PARENT = "existing_parent"
+    FILEINFO_PARENT_IS_DIR = "parent_is_dir"
+    FILEINFO_EXISTS = "exists"
+    FILEINFO_STEM = "stem"
+    FILEINFO_DRIVE = "drive"
+    FILEINFO_IS_ABSOLUTE_PATH = "is_absolute_path"
+    FILEINFO_SUFFIX = "suffix"
+    FILEINFO_IS_DIR = "is_dir"
+    FILEINFO_IS_FILE = "is_file"  
+    FILEINFO_EXISTING_APRENT = "existing_parent"  
+    FILEINFO_OBJECT = "object"  
+    FILEINFO_ACTIONS = "actions"  
 
     # regex pattern for a raw file name: 3 letters 5 decimals
     REGEX_RAW_FILE_NAME = r"[a-zA-Z]{3}\d{5}"
@@ -379,7 +397,7 @@ class Persistence:
         if (filepath != "" and filename != ""):
             join_path = str(Path(os.path.normpath(os.path.join(filepath,filename))))
             join_info =  Persistence.get_filepath_info(join_path)
-            full_filepath = join_info.get("filepath")
+            full_filepath = join_info.get(Persistence.FILEINFO_FILEPATH)
             file_info_list.append(join_info)
         
         if filepath != "":
@@ -398,8 +416,8 @@ class Persistence:
 
         # check if path or file name alone are already file name
         for file_info in file_info_list:
-            filepath = file_info["filepath"]
-            file_object = file_info["object"]
+            filepath = file_info[Persistence.FILEINFO_FILEPATH]
+            file_object = file_info[Persistence.FILEINFO_OBJECT]
 
             if file_object in object_filter:
                 full_filepath = filepath
@@ -421,55 +439,55 @@ class Persistence:
             np = str(f"ERROR in filepath {filepath}")
             p = Path("")
 
-        fileinfo["filepath"] = np
-        fileinfo["parts"] = list(p.parts)
-        fileinfo["parent"] = str(p.parent)
-        fileinfo["stem"] = p.stem
-        fileinfo["drive"] = p.drive
+        fileinfo[Persistence.FILEINFO_FILEPATH] = np
+        fileinfo[Persistence.FILEINFO_PARTS] = list(p.parts)
+        fileinfo[Persistence.FILEINFO_PARENT] = str(p.parent)
+        fileinfo[Persistence.FILEINFO_STEM] = p.stem
+        fileinfo[Persistence.FILEINFO_DRIVE] = p.drive
         is_absolute_path = False
         if len(p.drive) > 0:
             is_absolute_path = True
-        fileinfo["is_absolute_path"] = is_absolute_path
-        fileinfo["suffix"] = p.suffix[1:]
-        fileinfo["is_dir"] = os.path.isdir(p)
-        fileinfo["is_file"] = os.path.isfile(p)
+        fileinfo[Persistence.FILEINFO_IS_ABSOLUTE_PATH] = is_absolute_path
+        fileinfo[Persistence.FILEINFO_SUFFIX] = p.suffix[1:]
+        fileinfo[Persistence.FILEINFO_IS_DIR] = os.path.isdir(p)
+        fileinfo[Persistence.FILEINFO_IS_FILE] = os.path.isfile(p)
         parent_is_dir = os.path.isdir(p.parent)
 
         # only if path contains more than 1 element
         if ( parent_is_dir and len(p.parts) <= 1 ):
             parent_is_dir = False
-        fileinfo["parent_is_dir"] = parent_is_dir
+        fileinfo[Persistence.FILEINFO_PARENT_IS_DIR] = parent_is_dir
         
         # exists
-        fileinfo["exists"] = False 
-        if ( fileinfo["is_dir"] or  fileinfo["is_file"] ):
-             fileinfo["exists"] = True
+        fileinfo[Persistence.FILEINFO_EXISTS] = False 
+        if ( fileinfo[Persistence.FILEINFO_IS_DIR] or  fileinfo[Persistence.FILEINFO_IS_FILE] ):
+             fileinfo[Persistence.FILEINFO_EXISTS] = True
         
         # get existing parent if existing
         if parent_is_dir:
-            fileinfo["existing_parent"] = fileinfo["parent"] 
+            fileinfo[Persistence.FILEINFO_EXISTING_PARENT] = fileinfo[Persistence.FILEINFO_PARENT] 
         else:
-            fileinfo["existing_parent"] = None
+            fileinfo[Persistence.FILEINFO_EXISTING_PARENT] = None
         
-        fileinfo["object"]  = None
-        if fileinfo["is_dir"]:
-            fileinfo["object"]  = Persistence.OBJECT_FOLDER
+        fileinfo[Persistence.FILEINFO_OBJECT]  = None
+        if fileinfo[Persistence.FILEINFO_IS_DIR]:
+            fileinfo[Persistence.FILEINFO_OBJECT]  = Persistence.OBJECT_FOLDER
         
-        if fileinfo["is_file"]:
-            fileinfo["object"]  = Persistence.OBJECT_FILE
-            fileinfo["actions"] = Persistence.ACTIONS_FILE
+        if fileinfo[Persistence.FILEINFO_IS_FILE]:
+            fileinfo[Persistence.FILEINFO_OBJECT]  = Persistence.OBJECT_FILE
+            fileinfo[Persistence.FILEINFO_ACTIONS] = Persistence.ACTIONS_FILE
 
         # create potentially new folder name / file name
-        if ( fileinfo["existing_parent"] is not None and fileinfo["object"] is None):
-            if fileinfo["suffix"] == '':
-                fileinfo["object"]  = Persistence.OBJECT_NEW_FOLDER
+        if ( fileinfo[Persistence.FILEINFO_EXISTING_PARENT] is not None and fileinfo[Persistence.FILEINFO_OBJECT] is None):
+            if fileinfo[Persistence.FILEINFO_SUFFIX] == '':
+                fileinfo[Persistence.FILEINFO_OBJECT]  = Persistence.OBJECT_NEW_FOLDER
             else:
-                fileinfo["object"]  = Persistence.OBJECT_NEW_FILE
-                fileinfo["actions"] = Persistence.ACTIONS_NEW_FILE
+                fileinfo[Persistence.FILEINFO_OBJECT]  = Persistence.OBJECT_NEW_FILE
+                fileinfo[Persistence.FILEINFO_ACTIONS] = Persistence.ACTIONS_NEW_FILE
 
         # path is wrong, no actions possible
         if ( not parent_is_dir ) and ( len(p.parts) > 1 ) :
-            fileinfo["actions"] = Persistence.MODE_IGNORE
+            fileinfo[Persistence.FILEINFO_ACTIONS] = Persistence.MODE_IGNORE
 
         if showinfo:
             for k,v in fileinfo.items():
