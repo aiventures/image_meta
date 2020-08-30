@@ -26,6 +26,7 @@ class ExifTool(object):
     SENTINEL = "{ready}\r\n"
     SEPARATOR = os.sep
     EXIF_LIST_SEP = ", "
+    HIER_SEP = "|"
     NEW_LINE = "\r\n"
     ARGS = "args"
     COPYRIGHT = u'©'
@@ -136,6 +137,24 @@ class ExifTool(object):
     
     # Metadata that contain metadata in lists
     META_DATA_LIST = ['Keywords','HierarchicalSubject'] 
+
+    # Mapping Reverse Geo Data To Metadata
+    MAP_REVERSEGEO2META = { 'CountryPrimaryLocationName':'address_country',
+                            'CountryPrimaryLocationCode':'address_country_code',
+                            'ProvinceState':'address_state',
+                            'ImageDescription':'properties_display_name',
+                            'Caption-Abstract':'properties_display_name',
+                            'City': ('address_city','address_town','address_village'),
+                            'Sublocation': ('properties_name','address_tourism','address_historic',
+                                            'address_isolated_dwelling','address_hamlet',
+                                            'address_suburb','address_road'),
+                            'SpecialInstructions':'url_geohack' }
+    
+    # metadata hierarchy for geo data
+    META_HIER_GEO = ('CountryPrimaryLocationName','ProvinceState','City','Sublocation') 
+
+    # metadata short description fields
+    META_DESC = ('ObjectName','Title','Headline','CaptionAbstract') 
 
     # EXIFTOOL command line parameters, refer to
     # https://exiftool.org/exiftool_pod.html
@@ -675,7 +694,7 @@ class ExifTool(object):
         """ 
         hier_tag_dict = {}
         hier_meta_dict = {}
-        sep = "|"  
+        sep = ExifTool.HIER_SEP
         for meta_raw in meta_hierarchy_raw:
             level_current = meta_raw.count("\t")
             tag = meta_raw.replace("\t","").strip()
@@ -768,5 +787,57 @@ class ExifTool(object):
         title_dict = {}      
         [title_dict.update({d:title}) for d in meta_list]
         return title_dict
+    
+    @staticmethod
+    def map_geo2exif(geo_dict:dict,debug=False)->dict:
+        """ maps geo data to exif metadata """
+
+        meta = {}
+
+        # map metadata - reverse key dict
+        for meta_key,reverse_key in ExifTool.MAP_REVERSEGEO2META.items():
+            v = None
+            if isinstance(reverse_key,tuple):
+                for k in reverse_key:
+                    v = geo_dict.get(k,None)
+                    if v is not None:
+                        break
+            else:
+                v = geo_dict.get(reverse_key,None)
+            if v is not None:
+                meta[meta_key] = v
+
+        # process metadata / metadata hierarchy
+        keywords = []
+        hier_key = ""
+        for key in ExifTool.META_HIER_GEO:
+            value =  meta.get(key,None)
+            if value is not None:
+                keywords.append(value)
+
+        meta['Keywords'] = keywords
+
+        if keywords:
+            hier_key = ExifTool.HIER_SEP.join(keywords)
+        
+        meta['HierarchicalSubject'] = hier_key
+
+        # map geo meta data to description fields
+        title = None
+        city = meta.get('City',None)
+        subloc = meta.get('Sublocation',None)
+        if city is not None:
+            title = city
+        if subloc is not None:
+            title = title + " (" + subloc + ")"
+        if title is not None:
+            for d in ExifTool.META_DESC:
+                meta[d] = title
+        
+        if debug:
+            print("  ---- Exiftool.map_geo2exif ----")
+            Util.print_dict_info(meta)
+
+        return meta
 
 
