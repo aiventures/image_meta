@@ -218,7 +218,7 @@ class Util:
         for k,v in d.items():
             s = ""
             n = 0
-            if isinstance(v,list):
+            if ( isinstance(v,list) or isinstance(v,tuple) ):
                 n = min(len(v),list_elems)
                 print(f"Element {k} has list with {len(v)} elements, showing {n} elements")                
                 print(f"   {k}  ->  {v[:n]}")

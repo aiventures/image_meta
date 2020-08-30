@@ -54,6 +54,9 @@ class Geo:
         """Creates Exif Metadata Dictionary for GPS Coordinates"""
         geo_dict={}
 
+        if not (isinstance(latlon,list) ^ isinstance(latlon,tuple)):
+            return geo_dict
+
         lat,lon = latlon
 
         latref = "N"
@@ -73,9 +76,9 @@ class Geo:
             geo_dict["GPSAltitudeRef"] = "above"
             geo_dict["GPSAltitude"] = round(altitude,0)
         
-        if timestamp is not None:
-            geo_dict["GPSDateStamp"] = datetime.fromtimestamp(timestamp).strftime("%Y:%m:%d")
-            geo_dict["GPSTimeStamp"] = datetime.fromtimestamp(timestamp).strftime("%H:%M:%S") 
+        if isinstance(timestamp,int):
+            geo_dict["GPSDateStamp"] = datetime.utcfromtimestamp(timestamp).strftime("%Y:%m:%d")
+            geo_dict["GPSTimeStamp"] = datetime.utcfromtimestamp(timestamp).strftime("%H:%M:%S") 
 
         return geo_dict 
 
