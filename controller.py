@@ -3,6 +3,7 @@
 import os
 import pytz
 import time
+import traceback
 from image_meta.persistence import Persistence
 from image_meta.util import Util
 from image_meta.geo import Geo
@@ -53,6 +54,7 @@ class Controller(object):
     TEMPLATE_CREATE_DEFAULT_LATLON = "CREATE_DEFAULT_LATLON"  
     TEMPLATE_DEFAULT_MAP_DETAIL = "DEFAULT_MAP_DETAIL"
     TEMPLATE_DEFAULT_REVERSE_GEO = "DEFAULT_REVERSE_GEO"
+    TEMPLATE_DEFAULT_META_EXT = "DEFAULT_META_EXT"   
     TEMPLATE_DEFAULT_GPS_EXT = "DEFAULT_GPS_EXT"   
     TEMPLATE_GPS_READ_REMOTE = "GPS_READ_REMOTE"   
 
@@ -63,10 +65,28 @@ class Controller(object):
                        TEMPLATE_CALIB_IMG, TEMPLATE_CALIB_DATETIME,TEMPLATE_CALIB_OFFSET,TEMPLATE_GPX, 
                        TEMPLATE_DEFAULT_LATLON,TEMPLATE_CREATE_LATLON,
                        TEMPLATE_CREATE_DEFAULT_LATLON,TEMPLATE_DEFAULT_MAP_DETAIL,
-                       TEMPLATE_DEFAULT_REVERSE_GEO,TEMPLATE_DEFAULT_GPS_EXT,TEMPLATE_GPS_READ_REMOTE]
+                       TEMPLATE_DEFAULT_REVERSE_GEO,TEMPLATE_DEFAULT_GPS_EXT,TEMPLATE_DEFAULT_META_EXT,TEMPLATE_GPS_READ_REMOTE]
     
     # mapping template values to meta data
     TEMPLATE_META_MAP = {}
+
+    # template default mapping values
+    TEMPLATE_DEFAULT_VALUES = { TEMPLATE_IMG_EXTENSIONS:["jpg","jpeg"],
+                                TEMPLATE_TIMEZONE:"Europe/Berlin",
+                                TEMPLATE_OVERWRITE_KEYWORD:False,
+                                TEMPLATE_OVERWRITE_META:False,
+                                TEMPLATE_TECH_KEYWORDS:True,
+                                TEMPLATE_COPYRIGHT:"Unknown Artist",
+                                TEMPLATE_COPYRIGHT_NOTICE:"All rights reserved",
+                                TEMPLATE_CREDIT:"Unknown Artist",
+                                TEMPLATE_SOURCE:"Own Photography",
+                                TEMPLATE_CREATE_DEFAULT_LATLON:True,
+                                TEMPLATE_DEFAULT_MAP_DETAIL:17,
+                                TEMPLATE_KEYWORD_HIER:{},
+                                TEMPLATE_CALIB_OFFSET:0,
+                                TEMPLATE_DEFAULT_GPS_EXT:"geo",
+                                TEMPLATE_DEFAULT_META_EXT:"meta",
+                                TEMPLATE_CREATE_GEO_METADATA:True }    
 
     @staticmethod
     def create_param_template(filepath="",name="",showinfo=True):
@@ -443,40 +463,11 @@ class Controller(object):
     @staticmethod
     def get_template_default_values()->dict:
         """ get predefined template values """
+
         template_default_values = {}
-        for template_value in Controller.TEMPLATE_PARAMS:
-            v = None
-            if template_value == Controller.TEMPLATE_IMG_EXTENSIONS:
-                v = ["jpg","jpeg"]
-            elif template_value == Controller.TEMPLATE_TIMEZONE:
-                v = "Europe/Berlin"
-            elif template_value == Controller.TEMPLATE_OVERWRITE_KEYWORD:
-                v = False
-            elif template_value == Controller.TEMPLATE_OVERWRITE_META:
-                v = False   
-            elif template_value == Controller.TEMPLATE_TECH_KEYWORDS:
-                v = True
-            elif template_value == Controller.TEMPLATE_COPYRIGHT:
-                v = "Unknown Artist"
-            elif template_value == Controller.TEMPLATE_COPYRIGHT_NOTICE:
-                v = "All rights reserved"
-            elif template_value == Controller.TEMPLATE_CREDIT:
-                v = "Unknown Artist"
-            elif template_value == Controller.TEMPLATE_SOURCE:
-                v = "Own Photography"            
-            elif template_value == Controller.TEMPLATE_CREATE_DEFAULT_LATLON:
-                v = True
-            elif template_value == Controller.TEMPLATE_DEFAULT_MAP_DETAIL:
-                v = 17
-            elif template_value == Controller.TEMPLATE_KEYWORD_HIER:
-                v = {}
-            elif template_value == Controller.TEMPLATE_CALIB_OFFSET:
-                v = 0
-            elif template_value == Controller.TEMPLATE_DEFAULT_GPS_EXT:
-                v = "geo"
-            elif template_value == Controller.TEMPLATE_CREATE_GEO_METADATA:
-                v = True
-            template_default_values[template_value] = v
+
+        for k in Controller.TEMPLATE_PARAMS:
+            template_default_values[k] = Controller.TEMPLATE_DEFAULT_VALUES.get(k,None)
         return template_default_values
 
     @staticmethod
@@ -518,7 +509,7 @@ class Controller(object):
         return augmented_meta
 
     @staticmethod
-    def augment_gps_data(fileref:str,geo_dict:dict,template_dict:dict,metadata_dict:dict,utc_timestamp:int=None,debug=False):
+    def augment_gps_data(fileref:str,geo_dict:dict,template_dict:dict,metadata_dict:dict,utc_timestamp:int=None,debug=False,verbose=False):
         """ blend default and gps data """
 
         # geo metadata handling deactivated
@@ -563,9 +554,6 @@ class Controller(object):
         except:
             latlon = None
         
-        # eleref
-        elevation_ref = "above"
-        
         # get altitude
         try:
             altitude = geo_dict["ele"]
@@ -589,8 +577,6 @@ class Controller(object):
             reverse_geo = default_reverse_geo
             latlon = default_reverse_geo.get("latlon",None)
 
-        print(f"REVERSE GEO {reverse_geo}")
-
         # return empty reverse geo
         if not ( reverse_geo ):
             return {}
@@ -602,14 +588,14 @@ class Controller(object):
         geo_additional = Geo.get_exifmeta_from_latlon(latlon=latlon,altitude=altitude,timestamp=utc_timestamp)    
         reverse_geo_dict.update(geo_additional)
  
-        if debug:
+        if verbose:
             print("  ---- Exiftool.map_geo2exif ----")
             Util.print_dict_info(reverse_geo_dict)
     
         return reverse_geo_dict
 
     @staticmethod
-    def prepare_img_write(params:dict,show_info=False):
+    def prepare_img_write(params:dict,debug=False,verbose=False,meta_txt=True):
         """ blend template and metadata for each image file """
 
         workdir = params[Controller.TEMPLATE_WORK_DIR]
@@ -637,6 +623,9 @@ class Controller(object):
         credit_template = params[Controller.TEMPLATE_CREDIT]
         source_template = params[Controller.TEMPLATE_SOURCE]
 
+        # extension for metadata file
+        meta_ext = params.get(Controller.TEMPLATE_DEFAULT_META_EXT,"meta")
+
         # copy default values for metadata (can be either in template or in metadata template)
         default_iptc = {}
         default_iptc["Copyright"] = {"template":copyright_template,"meta":default_meta.get('Copyright',None) }
@@ -655,14 +644,14 @@ class Controller(object):
             print(f"Exiftool: {exif_ref} Work Dir: {workdir}, run can't be executed")
             return None
 
-        if show_info:
-            print(f"\n\n###### READING IMAGES in {workdir} ######")
+        if debug:
+            print(f"\n\n###### READING IMAGES in {workdir} ######\n")
         
         # read all metadata
-        with ExifTool(exif_ref,debug=show_info) as exif:
+        with ExifTool(exif_ref,debug=debug) as exif:
             img_meta_list = exif.get_metadict_from_img(filenames=workdir,metafilter=metadata_filter,filetypes=ext)
 
-        if show_info:
+        if debug:
             if isinstance(img_meta_list,dict):
                 print(f"\n\n###### Number of images ({len(img_meta_list.keys())}) ######")
             print(f"     GPS Datetime: {gps_datetime} GPS Datetime Image: {gps_datetime_image}  Offset: {gps_offset}s")
@@ -672,6 +661,7 @@ class Controller(object):
 
 
         for fileref,metadata_dict in img_meta_list.items():
+
             creation_date = metadata_dict.get("CreateDate",None)
             creation_timestamp = Util.get_localized_datetime(dt_in=creation_date,tz_in=timezone,tz_out="UTC",
                                                              debug=False,as_timestamp=True) 
@@ -723,46 +713,92 @@ class Controller(object):
                                                          metadata=metadata_dict,overwrite_meta=overwrite_meta)
             
             # gps metadata
-            gps_data = Controller.augment_gps_data(fileref=fileref,geo_dict=geo_data,template_dict=params,metadata_dict=metadata_dict,utc_timestamp=creation_timestamp,debug=show_info) 
+            gps_data = Controller.augment_gps_data(fileref=fileref,geo_dict=geo_data,template_dict=params,metadata_dict=metadata_dict,utc_timestamp=creation_timestamp,debug=False) 
 
             # gps keywords
-            geo_keywords = gps_data.get("Keywords",None)
-            geo_hier_keyword = gps_data.get("HierarchicalSubject",None)
+            try:
+                geo_keywords = gps_data.pop("Keywords")
+            except:
+                 geo_keywords = None
 
+            try:
+                geo_hier_keyword = gps_data.pop("HierarchicalSubject")
+            except:
+                geo_hier_keyword = None
+        
             if isinstance(geo_keywords,list):
                 keywords.extend(geo_keywords)
             
             if (isinstance(geo_hier_keyword,str)):
-                hier_keywords.append(geo_hier_keyword)
+                hier_keywords.append(geo_hier_keyword)             
 
             # remove duplicates
             keywords = list(dict.fromkeys(keywords).keys())
             hier_keywords = list(dict.fromkeys(hier_keywords).keys())
 
-            if show_info:
-                print(f"\n --- File {fileref} \n          corrected timestamp {creation_timestamp} offset {gps_offset} corrected UTC {creation_datetime} ")
-                print(f"                GPS timestamp {timestamp_gpx} UTC {datetime_gpx} \n      GPS DATA:",geo_data)     
-                print(f"      Tech Keywords {tech_keywords}")     
-                print(f"      Default Keywords: {default_keywords}")    
-                print(f"      File Keywords: {file_keywords}")     
-                print(f"      All Keywords:  {keywords}")   
-                print(f"      Hierarchy Keywords:  {hier_keywords}")   
-                print(f"      Other Metadata:      {augmented_meta}") 
-
             # add metadata
             augmented_meta["Keywords"] = keywords
-            augmented_meta["HierarchicalSubject"] = hier_keyword
+            augmented_meta["HierarchicalSubject"] = hier_keywords
 
-            # now augment all other metadata
-            # TODO add gps keywords and hierarchy gps if present
-            # todo overwrite with gps data only if overwrite meta is activated or data is not present yet
-            #     "OVERWRITE_KEYWORD": false,
-	        # "OVERWRITE_META": true,
+            augmented_meta.update(gps_data)
+
+            if debug:
+                print(f"\n --- File {fileref} \n          corrected timestamp {creation_timestamp} offset {gps_offset} corrected UTC {creation_datetime} ")
+                print(f"                GPS timestamp {timestamp_gpx} UTC {datetime_gpx} \n")     
+                if verbose:
+                    print("      METADATA STORED IN IMAGE")
+                    Util.print_dict_info(d=metadata_dict) 
+                    print(f"      GEO Data: {geo_data}")
+                    print(f"      Tech Keywords {tech_keywords}")     
+                    print(f"      Default Keywords: {default_keywords}")    
+                    print(f"      File Keywords: {file_keywords}")     
+                    print(f"      All Keywords:  {keywords}")   
+                    print(f"      Hierarchy Keywords:  {hier_keywords}")   
+                    print("      #### Augmented Metadata: ####\n")
+                    Util.print_dict_info(d=augmented_meta) 
+
+            new_metadata = {}
             
-            # hier_keywords
-            # gps keywords
+            if verbose:
+                print("      #### Augmented Metadata: ####\n")
 
-            print("         MMMMMMMMMMMMMMMMMMETA",metadata_dict)
+            overwrite_keyword = False
 
+            # now augment all metadata
+            for key,new in augmented_meta.items():
+                old = metadata_dict.get(key,None)
+                if verbose:
+                    if old is None:
+                        s = "++( NEW )++"
+                    else:
+                        s = "--( OLD )--"
+                    print(f"      {s} KEY {key} OLD {old} -> NEW {new}",end = '')
 
+                # write new metadata
+                if ( old is None ) or                                              \
+                   ( ( key in ExifTool.META_DATA_LIST ) and overwrite_keyword ) or \
+                   ( ( key not in ExifTool.META_DATA_LIST ) and overwrite_meta ):
+                    if verbose:
+                        print(" // WRITE VALUE //")
+                    new_metadata[key] = new
+                    continue
+                else:
+                    if verbose:
+                        print(" \\ KEEP OLD VALUE \\")
+                
+            # get the fileref for properties file
+            if meta_txt:
+                fp_info_suffix_len = len(Persistence.get_filepath_info(fileref).get("suffix",""))
+                fileref_meta = fileref[:(-fp_info_suffix_len)] + meta_ext
+                if debug:
+                    print(f"      Save metadata to {fileref_meta}")
+                try:
+                    meta_txt = ExifTool.dict2arg(meta_dict=new_metadata)
+                    if verbose:
+                        print(f" metadata to be saved: {meta_txt}")
+                    Persistence.save_file(data=meta_txt,filename=fileref_meta)
+                except:
+                    print(f"Exception with file {fileref_meta}, processing will be skipped")
+                    print(traceback.format_exc())
+        
         return None

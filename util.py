@@ -206,7 +206,7 @@ class Util:
         return idx
     
     @staticmethod
-    def print_dict_info(d:dict,s="",show_info=True,list_elems=9999,verbose=True):
+    def print_dict_info(d:dict,s="",show_info=True,list_elems=9999):
         """ prints information in dictionary """
         
         if not show_info:
@@ -220,11 +220,11 @@ class Util:
             n = 0
             if ( isinstance(v,list) or isinstance(v,tuple) ):
                 n = min(len(v),list_elems)
-                print(f"Element {k} has list with {len(v)} elements, showing {n} elements")                
+                print(f"   Element {k} has list with {len(v)} elements, showing {n} elements")                
                 print(f"   {k}  ->  {v[:n]}")
             elif isinstance(v,dict):
                 n = min(len(v.keys()),list_elems)
-                print(f"Element {k} has dictionary with {len(v.keys())} attributes, showing {n} attributes")
+                print(f"   Element {k} has dictionary with {len(v.keys())} attributes, showing {n} attributes")
                 d_keys = list(v.keys())[:n]
                 s = f"   {k}  ->  "
                 for d_key in d_keys:
