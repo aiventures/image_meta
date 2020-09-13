@@ -32,12 +32,23 @@ class Controller(object):
     TEMPLATE_KEYWORD_HIER = "KEYWORD_HIER"
     TEMPLATE_TECH_KEYWORDS = "TECH_KEYWORDS"
 
-    # Copyright Fields
+    # Other Metadata Fields
     TEMPLATE_COPYRIGHT = "COPYRIGHT"
     TEMPLATE_COPYRIGHT_NOTICE = "COPYRIGHT_NOTICE"
     TEMPLATE_CREDIT = "CREDIT"
     TEMPLATE_SOURCE = "SOURCE"
-
+    TEMPLATE_TRANSMISSION = "TRANSMISSION"
+    TEMPLATE_BYLINE = "BYLINE"
+    TEMPLATE_BYLINE_TITLE = "BYLINE_TITLE"
+    TEMPLATE_WRITER_EDITOR = "WRITER_EDITOR"
+    TEMPLATE_CAPTION_WRITER = "CAPTION_WRITER"
+    TEMPLATE_AUTHORS_POSITION = "AUTHORS_POSITION"
+    TEMPLATE_USER_COMMENT = "USER_COMMENT"
+    TEMPLATE_INTELLECTUAL_GENRE = "INTELLECTUAL_GENRE"
+    TEMPLATE_WEB_STATEMENT = "WEB_STATEMENT"
+    TEMPLATE_USAGE_TERMS = "USAGE_TERMS"
+    TEMPLATE_URL = "URL"                
+    
     # Geocoordinate Handling
     TEMPLATE_TIMEZONE = "TIMEZONE"
     TEMPLATE_CREATE_GEO_METADATA = "CREATE_GEO_METADATA"
@@ -60,8 +71,10 @@ class Controller(object):
 
     TEMPLATE_PARAMS = [TEMPLATE_WORK_DIR,TEMPLATE_IMG_EXTENSIONS,TEMPLATE_EXIFTOOL, TEMPLATE_META, TEMPLATE_OVERWRITE_KEYWORD, 
                        TEMPLATE_OVERWRITE_META, TEMPLATE_KEYWORD_HIER, TEMPLATE_TECH_KEYWORDS, TEMPLATE_COPYRIGHT, 
-                       TEMPLATE_COPYRIGHT_NOTICE, TEMPLATE_CREDIT, TEMPLATE_SOURCE, TEMPLATE_TIMEZONE,
-                       TEMPLATE_CREATE_GEO_METADATA,
+                       TEMPLATE_COPYRIGHT_NOTICE, TEMPLATE_CREDIT, TEMPLATE_SOURCE, TEMPLATE_TRANSMISSION,
+                       TEMPLATE_BYLINE,TEMPLATE_BYLINE_TITLE,TEMPLATE_WRITER_EDITOR,TEMPLATE_CAPTION_WRITER,TEMPLATE_AUTHORS_POSITION,
+                       TEMPLATE_USER_COMMENT, TEMPLATE_INTELLECTUAL_GENRE,TEMPLATE_WEB_STATEMENT,TEMPLATE_USAGE_TERMS,TEMPLATE_URL,                         
+                       TEMPLATE_TIMEZONE,TEMPLATE_CREATE_GEO_METADATA,
                        TEMPLATE_CALIB_IMG, TEMPLATE_CALIB_DATETIME,TEMPLATE_CALIB_OFFSET,TEMPLATE_GPX, 
                        TEMPLATE_DEFAULT_LATLON,TEMPLATE_CREATE_LATLON,
                        TEMPLATE_CREATE_DEFAULT_LATLON,TEMPLATE_DEFAULT_MAP_DETAIL,
@@ -80,13 +93,24 @@ class Controller(object):
                                 TEMPLATE_COPYRIGHT_NOTICE:"All rights reserved",
                                 TEMPLATE_CREDIT:"Unknown Artist",
                                 TEMPLATE_SOURCE:"Own Photography",
+                                TEMPLATE_TRANSMISSION:"ImageMeta (Python)",
+                                TEMPLATE_BYLINE:"Unknown Artist",
+                                TEMPLATE_BYLINE_TITLE:"Honorable",
+                                TEMPLATE_WRITER_EDITOR:"Unknown Editor",
+                                TEMPLATE_CAPTION_WRITER:"Unknown Caption Writer",
+                                TEMPLATE_AUTHORS_POSITION:"Photographer",
+                                TEMPLATE_USER_COMMENT:"", 
+                                TEMPLATE_INTELLECTUAL_GENRE:"Landscape",
+                                TEMPLATE_WEB_STATEMENT:"https://creativecommons.org/licenses/by-nc-nd/4.0/legalcode",
+                                TEMPLATE_USAGE_TERMS:"All rights reserved",
+                                TEMPLATE_URL:"",                                       
                                 TEMPLATE_CREATE_DEFAULT_LATLON:True,
                                 TEMPLATE_DEFAULT_MAP_DETAIL:17,
                                 TEMPLATE_KEYWORD_HIER:{},
                                 TEMPLATE_CALIB_OFFSET:0,
                                 TEMPLATE_DEFAULT_GPS_EXT:"geo",
                                 TEMPLATE_DEFAULT_META_EXT:"meta",
-                                TEMPLATE_CREATE_GEO_METADATA:True }    
+                                TEMPLATE_CREATE_GEO_METADATA:True }                                
 
     @staticmethod
     def create_param_template(filepath="",name="",showinfo=True):
@@ -487,7 +511,6 @@ class Controller(object):
             
             metavalue_file = metadata.get(metadata_key,None)
             metavalue_template = metadata_default.get("template",None)
-            # metavalue_default = metadata_default.get("meta",None)
             
             # get values
             metavalue = None            
@@ -597,6 +620,9 @@ class Controller(object):
     @staticmethod
     def prepare_img_write(params:dict,debug=False,verbose=False,meta_txt=True):
         """ blend template and metadata for each image file """
+        
+        now = datetime.now()
+        date_s = now.strftime("%Y:%m:%d")
 
         workdir = params[Controller.TEMPLATE_WORK_DIR]
         exif_ref = params[Controller.TEMPLATE_EXIFTOOL]
@@ -611,20 +637,31 @@ class Controller(object):
         keyword_hier = params[Controller.TEMPLATE_KEYWORD_HIER]
         default_keywords = default_meta.get("Keywords",[])
         write_tech_keywords = params[Controller.TEMPLATE_TECH_KEYWORDS]
-        
+
         # gps data / calculate time offset (calculated in prepare_execution) 
         gps_datetime_image = params[Controller.TEMPLATE_CALIB_IMG]
         gps_datetime = params[Controller.TEMPLATE_CALIB_DATETIME]
         gps_offset = params[Controller.TEMPLATE_CALIB_OFFSET]
 
-        # author and copyright info
-        copyright_template = params[Controller.TEMPLATE_COPYRIGHT]
-        copyright_notice_template = params[Controller.TEMPLATE_COPYRIGHT_NOTICE]
-        credit_template = params[Controller.TEMPLATE_CREDIT]
-        source_template = params[Controller.TEMPLATE_SOURCE]
-
         # extension for metadata file
         meta_ext = params.get(Controller.TEMPLATE_DEFAULT_META_EXT,"meta")
+
+        # author and copyright info
+        copyright_template = params.get(Controller.TEMPLATE_COPYRIGHT,"")
+        copyright_notice_template = params.get(Controller.TEMPLATE_COPYRIGHT_NOTICE,"")
+        credit_template = params.get(Controller.TEMPLATE_CREDIT,"")
+        source_template = params[Controller.TEMPLATE_SOURCE]
+        transmission = params.get(Controller.TEMPLATE_TRANSMISSION,"")+" "+date_s
+        byline = copyright_template
+        byline_title = params.get(Controller.TEMPLATE_BYLINE_TITLE,"")
+        writer_editor = params.get(Controller.TEMPLATE_WRITER_EDITOR,"")
+        caption_writer = params.get(Controller.TEMPLATE_CAPTION_WRITER,"")
+        authors_position = params.get(Controller.TEMPLATE_AUTHORS_POSITION,"")
+        user_comment = params.get(Controller.TEMPLATE_USER_COMMENT,"")
+        intellectual_genre =  params.get(Controller.TEMPLATE_INTELLECTUAL_GENRE,"")
+        web_statement = params.get(Controller.TEMPLATE_WEB_STATEMENT,"")
+        usage_terms = params.get(Controller.TEMPLATE_USER_COMMENT,"")
+        url_ref = params.get(Controller.TEMPLATE_URL,"")
 
         # copy default values for metadata (can be either in template or in metadata template)
         default_iptc = {}
@@ -632,6 +669,18 @@ class Controller(object):
         default_iptc["CopyrightNotice"] = {"template":copyright_notice_template,"meta":default_meta.get('CopyrightNotice',None) }
         default_iptc["Credit"] = {"template":credit_template,"meta":default_meta.get('Credit',None) }
         default_iptc["Source"] = {"template":source_template,"meta":default_meta.get('Source',None) }
+        default_iptc["OriginalTransmissionReference"] = {"template":transmission,"meta":default_meta.get('OriginalTransmissionReference',None) }
+        default_iptc["DateCreated"] = {"template":date_s,"meta":default_meta.get('DateCreated',None) }
+        default_iptc["By-line"] = {"template":byline,"meta":default_meta.get('By-line',None) }
+        default_iptc["By-lineTitle"] = {"template":byline_title,"meta":default_meta.get('By-lineTitle',None) }
+        default_iptc["Writer-Editor"] = {"template":writer_editor,"meta":default_meta.get('Writer-Editor',None) }
+        default_iptc["CaptionWriter"] = {"template":caption_writer,"meta":default_meta.get('CaptionWriter',None) }
+        default_iptc["AuthorsPosition"] = {"template":authors_position,"meta":default_meta.get('AuthorsPosition',None) }      
+        default_iptc["UserComment"] = {"template":user_comment,"meta":default_meta.get('UserComment',None) }    
+        default_iptc["IntellectualGenre"] = {"template":intellectual_genre,"meta":default_meta.get('IntellectualGenre',None) } 
+        default_iptc["WebStatement"] = {"template":web_statement,"meta":default_meta.get('WebStatement',None) } 
+        default_iptc["UsageTerms"] = {"template":usage_terms,"meta":default_meta.get('UsageTerms',None) } 
+        default_iptc["URL"] = {"template":url_ref,"meta":default_meta.get('URL',None) } 
 
         if not gpx is None:
             gpx_keys = sorted(gpx.keys())
@@ -685,10 +734,13 @@ class Controller(object):
                 geo_data = gpx[timestamp_gpx]
 
             # get technical keywords
-            tech_keywords = ExifTool.get_tech_keywords_from_metadict(metadata_dict)
+            tech_keywords,tech_hierarchy = ExifTool.get_tech_keywords_from_metadict(metadata_dict,debug=verbose)
 
             keywords = []
-            hier_keywords = []
+            if (len(tech_hierarchy)==0):
+                hier_keywords = []
+            else:
+                hier_keywords = [*tech_hierarchy]
 
             file_keywords = metadata_dict.get("Keywords",[])
             if not overwrite_keyword:
@@ -706,10 +758,8 @@ class Controller(object):
                 if hier_keyword is not None:
                     hier_keywords.append(hier_keyword)
 
-            # augment copyright info
-            copyright_meta = ["Copyright","CopyrightNotice","Credit","Source"]
-
-            augmented_meta = Controller.augment_meta_data(metadata_list=copyright_meta,metadata_default_dict=default_iptc,
+            # augment metadata
+            augmented_meta = Controller.augment_meta_data(metadata_list=ExifTool.IMG_SEG_AUGMENTED,metadata_default_dict=default_iptc,
                                                          metadata=metadata_dict,overwrite_meta=overwrite_meta)
             
             # gps metadata
@@ -762,8 +812,6 @@ class Controller(object):
             if verbose:
                 print("      #### Augmented Metadata: ####\n")
 
-            overwrite_keyword = False
-
             # now augment all metadata
             for key,new in augmented_meta.items():
                 old = metadata_dict.get(key,None)
@@ -773,8 +821,7 @@ class Controller(object):
                     else:
                         s = "--( OLD )--"
                     print(f"      {s} KEY {key} OLD {old} -> NEW {new}",end = '')
-
-                # write new metadata
+                
                 if ( old is None ) or                                              \
                    ( ( key in ExifTool.META_DATA_LIST ) and overwrite_keyword ) or \
                    ( ( key not in ExifTool.META_DATA_LIST ) and overwrite_meta ):

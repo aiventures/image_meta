@@ -96,18 +96,19 @@ class ExifTool(object):
     # 'Byline' [32] - Creator Name, 'Headline' [256],'BylineTitle' [32] - Title Of Creator
     # 'Artist' [],'ImageDescription' [],'Caption-Abstract' [2000],'Category' [3]
     IMG_SEGMENT_DSC = ['CurrentIPTCDigest', 'IPTCDigest', 'CodedCharacterSet', 'Subject', 'Keywords', 
-                       'HierarchicalSubject', 'ObjectName', 'UserComment', 'Byline', 'Headline', 
-                       'BylineTitle', 'Artist', 'ImageDescription', 'Caption-Abstract', 'Category']
+                       'HierarchicalSubject', 'ObjectName', 'UserComment', 'By-line', 'Headline', 
+                       'By-lineTitle', 'Artist', 'ImageDescription', 'Caption-Abstract', 'Category']
     # Author
-    # 'WriterEditor' [], 'Copyright' [], 'CopyrightNotice' [128], 'Credit' [32], 'CopyrightFlag' []
+    # 'Writer-Editor' [], 'Copyright' [], 'CopyrightNotice' [128], 'Credit' [32], 'CopyrightFlag' []
     # 'Source' [32], 'EditStatus' [64], 'FixtureIdentifier' [32], 'SpecialInstructions' [256]
     # 'OriginalTransmissionReference' [32]
-    IMG_SEGMENT_AUT = ['WriterEditor', 'Copyright', 'CopyrightNotice', 'Credit','CopyrightFlag', 'Source', 
+
+    IMG_SEGMENT_AUT = ['Writer-Editor', 'CaptionWriter','AuthorsPosition','Copyright', 'CopyrightNotice', 'Credit','CopyrightFlag', 'Source', 
                        'EditStatus', 'FixtureIdentifier', 'SpecialInstructions',  'OriginalTransmissionReference']
     # Location
-    # 'City' [32], 'Sublocation' [32], 'ProvinceState' [32]. 'CountryPrimaryLocationCode' [3]
-    # 'CountryPrimaryLocationName' [64]
-    IMG_SEGMENT_LOC = ['City', 'Sublocation', 'ProvinceState', 'CountryPrimaryLocationCode', 'CountryPrimaryLocationName'] 
+    # 'City' [32], 'Sub-location' [32], 'Province-State' [32]. 'Country-PrimaryLocationCode' [3]
+    # 'Country-PrimaryLocationName' [64]
+    IMG_SEGMENT_LOC = ['City', 'Sub-location', 'Province-State', 'Country-PrimaryLocationCode', 'Country-PrimaryLocationName'] 
     
     # GPS 
     IMG_SEGMENT_GPS = ['GPSVersionID', 'GPSLatitudeRef', 'GPSLongitudeRef', 'GPSAltitudeRef', 'GPSTimeStamp', 'GPSMapDatum', 
@@ -131,7 +132,12 @@ class ExifTool(object):
     IMG_SEG_TECH_USED = ["Make","Model","LensMount","LensModel","LensInfo","ExposureTime","ISO","Aperture",
                          "FocalLength","ScaleFactor35efl","FocalLengthIn35mmFormat", "FOV","LensFormat","CircleOfConfusion",
                          "HyperfocalDistance","LightValue","ExposureCompensation","FocusMode","FocusDistance2","Software"]
-    
+
+    # image metadata that can be augmented (= metadata can be blended by template files)
+    IMG_SEG_AUGMENTED = ["Copyright","CopyrightNotice","Credit","Source","OriginalTransmissionReference","DateCreated",
+                         "By-line","By-lineTitle","Writer-Editor""CaptionWriter","AuthorsPosition","UserComment","IntellectualGenre",
+                         "WebStatement","UsageTerms","URL"]
+
     # Geo Data 
     IMG_SEG_GEO = [*IMG_SEGMENT_DATE,*IMG_SEGMENT_GPS,*IMG_SEGMENT_LOC]
     
@@ -139,22 +145,22 @@ class ExifTool(object):
     META_DATA_LIST = ['Keywords','HierarchicalSubject'] 
 
     # Mapping Reverse Geo Data To Metadata
-    MAP_REVERSEGEO2META = { 'CountryPrimaryLocationName':'address_country',
-                            'CountryPrimaryLocationCode':'address_country_code',
-                            'ProvinceState':'address_state',
+    MAP_REVERSEGEO2META = { 'Country-PrimaryLocationName':'address_country',
+                            'Country-PrimaryLocationCode':'address_country_code',
+                            'Province-State':'address_state',
                             'ImageDescription':'properties_display_name',
                             'Caption-Abstract':'properties_display_name',
                             'City': ('address_city','address_town','address_village'),
-                            'Sublocation': ('properties_name','address_tourism','address_historic',
+                            'Sub-location': ('properties_name','address_tourism','address_historic',
                                             'address_isolated_dwelling','address_hamlet',
                                             'address_suburb','address_road'),
                             'SpecialInstructions':'url_geohack' }
     
     # metadata hierarchy for geo data
-    META_HIER_GEO = ('CountryPrimaryLocationName','ProvinceState','City','Sublocation') 
+    META_HIER_GEO = ('Country-PrimaryLocationName','Province-State','City','Sub-location') 
 
     # metadata short description fields
-    META_DESC = ('ObjectName','Title','Headline','CaptionAbstract') 
+    META_DESC = ('ObjectName','Title','Headline','Caption-Abstract') 
 
     # EXIFTOOL command line parameters, refer to
     # https://exiftool.org/exiftool_pod.html
@@ -270,16 +276,6 @@ class ExifTool(object):
             metafilter: only keys matching to list in metafilter will be written (None=all data)
             add_digest: digest value to be written to args file
         """
-        
-        # gets the file list
-        #img_list = Persistence.get_file_list(path=path,file_type_filter=filetypes)
-        
-        # reads arg metadata from image file as meta data dictionary
-        #meta_args = self.get_metadict_from_img(img_list)
-        #args_files = []
-        
-        #for f,meta in meta_args.items():
-            # construct new args filename
 
         p = Path(path)
         parent = p.parent
@@ -534,6 +530,11 @@ class ExifTool(object):
         def zip_str(s):
             return "".join(s.split(" "))
         
+        make = metadict.get("Make","Unknown Make")
+        model = metadict.get("Model","Unknown Model")
+
+        hier_tech = "Tech"+ExifTool.HIER_SEP
+        hier_tech_params_out = []
         tech_params_out = []
         
         if debug is True:
@@ -546,7 +547,11 @@ class ExifTool(object):
             lens_format = "("+lens_format+")"
         else:
             lens_format = ''
-        tech_params_out.append((" ".join(["CAM",metadict.get("Make",""),metadict.get("Model",""),lens_format])).strip())    
+        cam_used = (" ".join(["CAM",make,model,lens_format])).strip()
+        tech_params_out.append(cam_used)
+        hier_cam = hier_tech+"Camera"+ExifTool.HIER_SEP+cam_used
+        hier_tech_params_out.append(hier_cam)
+        hier_cam += ExifTool.HIER_SEP
 
         # get lens focal length aperture and ISO
         lens = metadict.get("LensModel","")
@@ -554,30 +559,38 @@ class ExifTool(object):
             lens = metadict.get("LensInfo","")
         elif lens == "----":
             lens = "MANUAL"
-        tech_params_out.append(("LENS "+lens))
+        tech_params_out.append(lens)
+        hier_lens = hier_tech+"Lens"+ExifTool.HIER_SEP+lens+ExifTool.HIER_SEP
 
-        fl = zip_str(metadict.get("FocalLength","N/A"))
+        fl = zip_str(metadict.get("FocalLength","NA"))
+
         if fl[0:3] == "0.0":
             fl = ""
         else:
             fl = "f"+fl
+            tech_params_out.append(fl)
+            hier_tech_params_out.append((hier_lens + "Focal Length" + ExifTool.HIER_SEP + fl))
+        
         ap = metadict.get("Aperture","NA")
         if ap == "NA":
             ap = ""
         else:
-            ap = " F"+ap
+            ap = "F"+ap
+            tech_params_out.append(ap)
+            hier_tech_params_out.append((hier_lens + "Aperture" + ExifTool.HIER_SEP + ap))            
 
-        s = fl+ap
-        s += " T"+metadict.get("ExposureTime","N/A")+"s"
-        s += " ISO"+metadict.get("ISO","N/A")
-        s = s.strip()
-        tech_params_out.append(s)
+        s = fl+" "+ap
+        exp_time = "T "+metadict.get("ExposureTime","N/A")+"s"
+        hier_tech_params_out.append((hier_cam + "Exposure Time" + ExifTool.HIER_SEP + exp_time))
+        tech_params_out.append(exp_time)
+        s += " "+exp_time
 
-        # get 35mm equivalents
-        if lens != "MANUAL":
-            s = "f(35mm) "+zip_str(metadict.get("FocalLengthIn35mmFormat","N/A"))
-            s += " ("+metadict.get("ScaleFactor35efl","N/A")+")"
-            tech_params_out.append(s)
+        iso = "ISO "+metadict.get("ISO","N/A")
+        hier_tech_params_out.append((hier_cam + "ISO" + ExifTool.HIER_SEP + iso))
+        tech_params_out.append(iso)
+        # s += " "+iso
+        # s = s.strip()
+        # tech_params_out.append(s)
         
         # photonerd params :-)
         coc = metadict.get("CircleOfConfusion")
@@ -586,41 +599,59 @@ class ExifTool(object):
             try:
                 coc_nm = "coc "+str(int(1000*float(coc_nm)))+"nm"
                 tech_params_out.append(coc_nm)
+                hier_tech_params_out.append((hier_cam + "Circle Of Confusion" + ExifTool.HIER_SEP + coc_nm))
             except:
                 pass
                 
         foc = metadict.get("FocusDistance2","")  
         if not foc == "":
-            foc = "focus dist. "+zip_str(foc)    
-            tech_params_out.append(foc)
+            v = "focus dist." + zip_str(foc)    
+            hier_tech_params_out.append((hier_lens + "Focus Distance" + ExifTool.HIER_SEP + v))
+            tech_params_out.append(v)
+            #foc = "focus dist. " + v  
+            #tech_params_out.append(foc)
             
         hfoc = metadict.get("HyperfocalDistance","")       
         if not hfoc == "":
-            hfoc = "hyperfocal "+zip_str(hfoc)    
-            tech_params_out.append(hfoc)
+            v = "hyperfocal " + zip_str(hfoc)
+            hier_tech_params_out.append((hier_lens + "Hyperfocal" + ExifTool.HIER_SEP + v))
+            tech_params_out.append(v)
+            #hfoc = "hyperfocal "+ v  
+            #tech_params_out.append(hfoc)
                 
         fov = metadict.get("FOV","")
         if not fov == "":
-            fov = "fov "+zip_str(fov)
-            tech_params_out.append(fov)
+            v = "FOV " + zip_str(fov)
+            hier_tech_params_out.append((hier_lens + "FOV" + ExifTool.HIER_SEP + v))
+            tech_params_out.append(v)
+            #fov = "fov "+ v
+            #tech_params_out.append(fov)
         
         ev = metadict.get("LightValue","")
         if not ev == "":
-            ev= "Light "+ev+"EV"
+            ev = ev + "EV"
+            hier_tech_params_out.append((hier_cam + "Light Value" + ExifTool.HIER_SEP + ev))
             tech_params_out.append(ev)
-                
+            #ev= "Light "+ev+"EV"
+            #tech_params_out.append(ev)
         
         focus = metadict.get("FocusMode","")
         if not focus == "":
             focus= "focus "+focus
             tech_params_out.append(focus)
+            hier_tech_params_out.append((hier_cam + "Focus Mode" + ExifTool.HIER_SEP + focus))
         
-        # clean out empty elements
+        # clean out empty elements / duplicates
         tech_params_out = list(filter(lambda v:v!="",tech_params_out))
+        hier_tech_params_out = list(filter(lambda v:v!="",hier_tech_params_out))
+        tech_params_out = list(dict.fromkeys(tech_params_out))
+        hier_tech_params_out = list(dict.fromkeys(hier_tech_params_out))
+
         if debug is True:
-            print("OUT PARAMS \n",tech_params_out)    
+            print("TECH PARAMS OUT \n",tech_params_out)    
+            print("TECH PARAMS (HIERARCHY) OUT \n",hier_tech_params_out)    
         
-        return tech_params_out    
+        return [tech_params_out,hier_tech_params_out]    
 
     @staticmethod
     def get_gps_keywords_from_gpx(metadict:dict,gpx_dict:dict,gpx_keys:list=None,
@@ -772,7 +803,7 @@ class ExifTool(object):
         """ returns metadata attributes for author """   
         author_dict = {}      
         copyright = f"{ExifTool.COPYRIGHT} {datetime.now().strftime('%Y')} {author}"
-        author_dict['WriterEditor'] = author
+        author_dict['Writer-Editor'] = author
         author_dict['Copyright'] = copyright
         author_dict['CopyrightNotice'] = "All Rights Reserved"
         author_dict['Credit'] = author
@@ -808,7 +839,7 @@ class ExifTool(object):
                 meta[meta_key] = v
 
         # process metadata / metadata hierarchy
-        keywords = []
+        keywords = ["Location"]
         hier_key = ""
         for key in ExifTool.META_HIER_GEO:
             value =  meta.get(key,None)
@@ -825,7 +856,7 @@ class ExifTool(object):
         # map geo meta data to description fields
         title = None
         city = meta.get('City',None)
-        subloc = meta.get('Sublocation',None)
+        subloc = meta.get('Sub-location',None)
         if city is not None:
             title = city
         if subloc is not None:
