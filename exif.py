@@ -25,6 +25,7 @@ class ExifTool(object):
 
     SENTINEL = "{ready}\r\n"
     SEPARATOR = os.sep
+    METADATA_LOCATION_ROOT = "Orte"
     EXIF_LIST_SEP = ", "
     HIER_SEP = "|"
     NEW_LINE = "\r\n"
@@ -839,7 +840,7 @@ class ExifTool(object):
                 meta[meta_key] = v
 
         # process metadata / metadata hierarchy
-        keywords = ["Location"]
+        keywords = [ExifTool.METADATA_LOCATION_ROOT]
         hier_key = ""
         for key in ExifTool.META_HIER_GEO:
             value =  meta.get(key,None)
