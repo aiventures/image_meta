@@ -6,7 +6,9 @@ from math import cos
 from math import asin
 from math import floor
 from image_meta.util import Util
+from image_meta.persistence import Persistence
 from datetime import datetime
+from datetime import timedelta
 import requests
 
 class Geo:
@@ -94,8 +96,11 @@ class Geo:
     @staticmethod
     def latlon2geohack(latlon):
         """ converts latlon to decimals in geohack format """
-        latlon = list(map(lambda n:(round(n,5)),latlon))
-        lat,lon = latlon
+        try:
+            latlon = list(map(lambda n:(round(n,7)),latlon))
+            lat,lon = latlon
+        except:
+            return None
         lat_ref = "N"
         lon_ref = "E"
         if lat < 0:
@@ -258,3 +263,97 @@ class Geo:
         geo_dict = Geo.nominatimreverse2dict(geo_json,debug=debug) 
 
         return geo_dict
+    
+    @staticmethod
+    def get_nearest_gps_waypoint(latlon_ref,gps_fileref,date_s_ref=None,tz = 'Europe/Berlin',dist_max=1000,debug=False)->dict:
+        """ Gets closest GPS point in a gps track for given latlon coordinate and time difference if datetime string is given
+            latlon_ref  -- latlon coordinates (list or tuple)
+            gps_fileref -- filepath to gpsx file
+            date_s_ref  -- datetime of reference point  "%m:%d:%Y %H:%M:%S"
+            tz          -- timezone (pytz.tzone)
+            distmax     -- maximum distance in m whether point will be used as minimum distance (default 1000m)  
+            debug       -- outpur additional information
+        """
+
+        gps_min = {}
+
+        dist_min = dist_max
+
+        tz = 'Europe/Berlin'
+        dt_ref = Util.get_datetime_from_string(datetime_s=date_s_ref,local_tz=tz)
+        
+        # geohack url
+        url_geohack = Geo.GEOHACK_URL+Geo.latlon2geohack(latlon_ref)
+
+        # load gps data 
+        gps_coords = Persistence.read_gpx(gpsx_path=gps_fileref)
+
+        if not gps_coords:
+            print(f"no gps data found in file {gps_fileref}")
+            return gps_min
+
+        num = len(gps_coords.keys())
+
+        timestamps = list(gps_coords.keys())
+        timestamps.sort()
+        timestamp_min = min(timestamps)
+        timestamp_max = max(timestamps)
+
+        # utc from (utc) timestamp 
+        dt_min_utc = datetime.utcfromtimestamp(timestamp_min)
+        dt_max_utc = datetime.utcfromtimestamp(timestamp_max)
+
+        # get localized datetime
+        dt_min = Util.get_localized_datetime(dt_min_utc,tz_in="UTC",tz_out=tz)
+        dt_max = Util.get_localized_datetime(dt_max_utc,tz_in="UTC",tz_out=tz)
+
+        # get geo data
+        geo_min = gps_coords[timestamp_min]
+        latlon_min = (geo_min["lat"],geo_min["lon"])
+        geo_max = gps_coords[timestamp_max]
+        latlon_max = (geo_max["lat"],geo_max["lon"])
+
+        if debug:
+            dist_max = int(1000*Geo.get_distance(latlon_ref,latlon_max))
+            dist_min = int(1000*Geo.get_distance(latlon_ref,latlon_min))    
+            dist_track = int(1000*Geo.get_distance(latlon_max,latlon_min))    
+            print(f"--- Track '{geo_min.get('track_name','Unknown Track')}': {num} data points, duration {dt_max-dt_min}") 
+            print(f"    Timezone: {tz}")    
+            print(f"    Start latlon: {latlon_min} / Datetime {dt_min}")
+            print("                  ",(Geo.GEOHACK_URL+Geo.latlon2geohack(latlon_min))) 
+            print(f"    End latlon: {latlon_max} / Datetime {dt_max}")
+            print("                ",(Geo.GEOHACK_URL+Geo.latlon2geohack(latlon_max)))     
+            print(f"--- Reference latlon: {latlon_ref} / Datetime {dt_ref}")
+            print("    Geohack url:",url_geohack)
+            print(f"--- Distance: start-ref {dist_min}m, end-ref {dist_max}m, start-end {dist_track}m")
+        
+        timestamp_min = None
+
+        for timestamp,gps_coord in gps_coords.items():
+            latlon = [gps_coord["lat"],gps_coord["lon"]]
+            dist = int(1000*Geo.get_distance(latlon_ref,latlon))
+            if dist < dist_min:
+                dist_min = dist
+                datetime_min_utc = datetime.utcfromtimestamp(timestamp)
+                datetime_min = Util.get_localized_datetime(datetime_min_utc,tz_in="UTC",tz_out="Europe/Berlin")
+                gps_min["timestamp_utc"] = timestamp
+                gps_min["datetime"] = datetime_min
+                gps_min["lat"] =  gps_coord["lat"]
+                gps_min["lon"] =  gps_coord["lon"]
+                gps_min["ele"] =  gps_coord["ele"]
+                gps_min["distance_m"] = dist_min
+                if dt_ref is not None:
+                    gps_min["timedelta_from_ref"] =  int(timedelta.total_seconds(datetime_min-dt_ref))
+                else:
+                    gps_min["timedelta_from_ref"] =  None
+                gps_min["url_geohack"] = Geo.GEOHACK_URL+Geo.latlon2geohack(latlon)        
+
+        if gps_min.get("distance_m",dist_max) < dist_max:
+            if debug:
+                print(f"--- Nearest GPS Trackpoint")
+                Util.print_dict_info(d=gps_min)
+        else:
+            print(f"no gps points found in vicinity of {dist_min} m")        
+        
+        return gps_min
+

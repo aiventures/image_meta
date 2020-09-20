@@ -12,7 +12,7 @@ class Util:
     NOT_FOUND = -1
 
     @staticmethod
-    def get_datetime_from_string(datetime_s:str,local_tz='Europe/Berlin',debug=False) -> str:
+    def get_datetime_from_string(datetime_s:str,local_tz='Europe/Berlin',debug=False):
         """ returns datetime for date string with timezone 
             allowed formats:  ####:##:## ##:##:##  (datetime localized with local_tz) 
                               ####-##-##T##:##:##Z  (UTC) 
@@ -206,9 +206,11 @@ class Util:
         return idx
     
     @staticmethod
-    def print_dict_info(d:dict,s="",show_info=True,list_elems=9999):
+    def print_dict_info(d:dict,s="",show_info=True,list_elems=9999,num_spaces=4):
         """ prints information in dictionary """
         
+        sp = " " * num_spaces
+
         if not show_info:
             return
 
@@ -220,15 +222,15 @@ class Util:
             n = 0
             if ( isinstance(v,list) or isinstance(v,tuple) ):
                 n = min(len(v),list_elems)
-                print(f"   Element {k} has list with {len(v)} elements, showing {n} elements")                
-                print(f"   {k}  ->  {v[:n]}")
+                print(f"{sp}Element {k} has list with {len(v)} elements, showing {n} elements")                
+                print(f"{sp}{k}  ->  {v[:n]}")
             elif isinstance(v,dict):
                 n = min(len(v.keys()),list_elems)
-                print(f"   Element {k} has dictionary with {len(v.keys())} attributes, showing {n} attributes")
+                print(f"{sp}Element {k} has dictionary with {len(v.keys())} attributes, showing {n} attributes")
                 d_keys = list(v.keys())[:n]
-                s = f"   {k}  ->  "
+                s = f"{sp}{k}  ->  "
                 for d_key in d_keys:
-                    s += f"\n   {d_key}:{v[d_key]}"
+                    s += f"\n{sp}{d_key}:{v[d_key]}"
                 print(s)
             else:
-                print(f"   {k}  ->   {v}")
+                print(f"{sp}{k}  ->   {v}")
