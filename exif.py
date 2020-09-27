@@ -405,46 +405,47 @@ class ExifTool(object):
             
         return args_files
 
-    def write_args2img(self,path,filetypes=["jpg","jpeg"],charset="UTF8",show_info=False) -> None:
+    def write_args2img(self,img_path,img_ext=["jpg","jpeg"],
+                       meta_ext="meta",
+                       charset="UTF8",show_info=False) -> None:
         """ writes metadata from args file into image files in a given directory path with extension jpg
             args file needs to have the same name as the corresponding image name 
             (test.jpg requires a test.args file )  
         """
 
-        # writing params
-        args_list_raw = [*self.EXIF_ARG_WRITE,'-charset',charset,'-@']
-        arg_files = []
+        #tbd 
+        ext = [*img_ext,meta_ext]
+        filerefs = Persistence.get_file_list(path=img_path,file_type_filter=ext)
 
-        if os.path.isfile(path):
-            # single image file
-            for ty in filetypes:
-                arg_file = path.replace(ty,"args")
-                if arg_file != path:
-                    arg_files = [arg_file]
-        else:
-            # get all arg files in path
-            arg_files = Persistence.get_file_list(path=path,file_type_filter="args")
+        # # get all image files with metadata file
+        for fileref in filerefs:    
+            fp_info = Persistence.get_filepath_info(fileref)
+            suffix = fp_info["suffix"]
+            if suffix == meta_ext:
+                continue
+            if not ((fp_info["filepath"][:-len(suffix)]+meta_ext) in filerefs):
+                if show_info:
+                    print(f"File {fileref} has no metadata file")
+                filerefs.remove(fileref)
 
-        print("ARG FILES",arg_files)
-
-        if show_info is True:
-            print(f"WRITE IMAGE METADAT: EXIFTOOL ARGS {args_list_raw}")
-            print(f"Arg File List # files ({len(arg_files)}): {str(arg_files)[:300]} ... \nWRITING -> ",end="")   
-
-        # for each arg file get the corresponding image file
-        for arg_file in arg_files:
-            p = Path(arg_file)
-            parent = p.parent
-            stem = p.stem + "."
-            for f in filetypes:
-                img_path = os.path.join(parent,stem+f)
-                if os.path.isfile(img_path):
-                    args_list = [*args_list_raw,arg_file]
-                    self.execute(*args_list,img_path)
-                    if show_info is True:
-                        print(f".", end = "")
+        img_filerefs = list(filter(lambda fileref: fileref[(len(fileref)-len(meta_ext)):] != meta_ext , filerefs))
         
-        if show_info is True:
+        if show_info:
+            print(f"Writing metadata for {len(img_filerefs)} files")
+        
+        args_list_raw = [*self.EXIF_ARG_WRITE,'-charset',charset,'-@']
+        
+        for img_fileref in img_filerefs:
+            
+            # get metadata ref
+            suffix = Persistence.get_filepath_info(img_fileref)["suffix"]
+            meta_fileref = img_fileref[:-(len(suffix))]+meta_ext    
+            args_list = [*args_list_raw,meta_fileref]
+            self.execute(*args_list,img_fileref)
+            if show_info is True:
+                print(f".", end = "")
+        
+        if show_info:
             print("\nWRITING IS FINISHED!")
         
         return None

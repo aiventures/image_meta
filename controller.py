@@ -849,3 +849,10 @@ class Controller(object):
                     print(traceback.format_exc())
         
         return None
+
+    @staticmethod
+    def img_write(img_path,exif_ref,img_ext=Controller.TEMPLATE_IMG_EXTENSIONS,meta_ext=Controller.TEMPLATE_DEFAULT_META_EXT,show_info=False):
+        """ write metadata to images that also have metadata files """
+        with ExifTool(executable=exif_ref) as e:
+            e.write_args2img(img_path=img_path,img_ext=img_ext,meta_ext=meta_ext,show_info=show_info)
+        return None
