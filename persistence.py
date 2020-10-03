@@ -494,4 +494,41 @@ class Persistence:
                 print(f"{k} -> {v}")
 
         return fileinfo
-            
+
+    @staticmethod
+    def delete_related_files(fileref_list,file_exts=["meta","geo"],additional_suffixes=["_original"]):
+        """ deletes additional files having the same filestem in fileref_list and given file extensions
+            or original file extension with appended suffix
+        """ 
+        return None
+#file_list = Persistence.get_file_list(path=fp,file_type_filter=["jpg"])
+# exts = ["meta","geo"]
+# additional_suffixes = ["_original"]
+# fileref_delete_list = []
+# for fileref in file_list:
+#     #print(fileref)
+#     file_exts = []
+#     # get extensions
+#     file_info = Persistence.get_filepath_info(fileref)
+#     if not file_info["is_file"]:
+#         continue
+        
+#     file_suffix = file_info.get('suffix','')
+
+#     for additional_suffix in additional_suffixes:
+#         file_exts.append((file_suffix+additional_suffix))
+#     file_exts = [*file_exts,*exts]
+#     file_stem = fileref[:-len(file_suffix)]
+
+#     for file_ext in file_exts:
+#         fileref_del = file_stem+file_ext
+#         file_info_del = Persistence.get_filepath_info(fileref_del)
+#         if file_info_del["exists"]:
+#             #print(fileref_del)
+#             fileref_delete_list.append(fileref_del)
+# len(fileref_delete_list)
+
+# except(OSError) as (errno, strerror, filename):
+# print "OSError [%d]: %s at %s" % (errno, strerror, filename)
+# import os
+# os.remove(file_location)            
