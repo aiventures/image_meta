@@ -110,7 +110,10 @@ class Controller(object):
                                 TEMPLATE_CALIB_OFFSET:0,
                                 TEMPLATE_DEFAULT_GPS_EXT:"geo",
                                 TEMPLATE_DEFAULT_META_EXT:"meta",
-                                TEMPLATE_CREATE_GEO_METADATA:True }                                
+                                TEMPLATE_CREATE_GEO_METADATA:True }     
+
+    # artifact file extensions (gps data, metadata)
+    ARTIFACT_EXT = ["_original",TEMPLATE_DEFAULT_VALUES[TEMPLATE_DEFAULT_GPS_EXT],TEMPLATE_DEFAULT_VALUES[TEMPLATE_DEFAULT_META_EXT]]
 
     @staticmethod
     def create_param_template(filepath="",name="",showinfo=True):
@@ -851,8 +854,57 @@ class Controller(object):
         return None
 
     @staticmethod
-    def img_write(img_path,exif_ref,img_ext=Controller.TEMPLATE_IMG_EXTENSIONS,meta_ext=Controller.TEMPLATE_DEFAULT_META_EXT,show_info=False):
+    def img_write(img_path,exif_ref,img_ext=TEMPLATE_IMG_EXTENSIONS,meta_ext=TEMPLATE_DEFAULT_META_EXT,show_info=False):
         """ write metadata to images that also have metadata files """
+        
+        img_file_refs = []
+
         with ExifTool(executable=exif_ref) as e:
-            e.write_args2img(img_path=img_path,img_ext=img_ext,meta_ext=meta_ext,show_info=show_info)
-        return None
+            img_file_refs = e.write_args2img(img_path=img_path,img_ext=img_ext,meta_ext=meta_ext,show_info=show_info)
+        return img_file_refs
+    
+    @staticmethod
+    def process_images(template_fileref,showinfo=False,verbose=False,cleanup=False):
+        """ executes the whole workflow: read write parameters, write metadata and gps files, execute write to image files, cleanup  
+            Arguments
+            template_fileref: filepath to arguments file (as created by method create_param_template)
+            showinfo: show execution info
+            verbose: show detailed_info
+            cleanup: delete created artifact files
+        """
+        
+        finished = False
+
+        try:
+            if showinfo:
+                print(f"\n##### 1/4 processs_images: GET PARAMS from {template_fileref}  #####\n")
+            control_params = Controller.read_params_from_file(filepath=template_fileref,showinfo=showinfo)
+            
+            if showinfo:
+                print("\n##### 2/4 processs_images: prepare execution #####\n")
+            augmented_params = Controller.prepare_execution(template_dict=control_params,showinfo=showinfo)   
+            
+            exif_ref = augmented_params["EXIFTOOL"]
+            img_path = augmented_params["WORK_DIR"]
+
+            if showinfo:
+                print(f"    EXIFTOOL: {exif_ref}\n    IMAGE PATH: {img_path}\n")            
+
+            if showinfo:
+                print("\n##### 3/4 processs_images: prepare image write #####\n")            
+            Controller.prepare_img_write(params=augmented_params,debug=showinfo,verbose=verbose)
+            
+            if showinfo:
+                print("\n##### 4/4 processs_images: write images #####\n")
+            
+            with ExifTool(executable=exif_ref) as e:
+                img_filerefs = e.write_args2img(img_path=img_path,show_info=showinfo)
+            
+            print(img_filerefs)
+
+            finished = True
+        except:
+            print(f"\nException occured with Controller.process_images(fileref={template_fileref})")
+            print(traceback.format_exc())
+
+        return finished

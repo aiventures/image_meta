@@ -448,7 +448,7 @@ class ExifTool(object):
         if show_info:
             print("\nWRITING IS FINISHED!")
         
-        return None
+        return img_filerefs
 
     @staticmethod
     def arg2dict(args:list,filter_list:list=None,delete:bool=False)->dict:
