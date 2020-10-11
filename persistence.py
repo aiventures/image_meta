@@ -496,39 +496,93 @@ class Persistence:
         return fileinfo
 
     @staticmethod
-    def delete_related_files(fileref_list,file_exts=["meta","geo"],additional_suffixes=["_original"]):
+    def delete_related_files(fp,input_file_ext_list=["jpg"],delete_file_ext_list=["arw"],delete=False,verbose=False,show_info=True,case_sensitive=False):
         """ deletes additional files having the same filestem in fileref_list and given file extensions
             or original file extension with appended suffix
-        """ 
-        return None
-#file_list = Persistence.get_file_list(path=fp,file_type_filter=["jpg"])
-# exts = ["meta","geo"]
-# additional_suffixes = ["_original"]
-# fileref_delete_list = []
-# for fileref in file_list:
-#     #print(fileref)
-#     file_exts = []
-#     # get extensions
-#     file_info = Persistence.get_filepath_info(fileref)
-#     if not file_info["is_file"]:
-#         continue
-        
-#     file_suffix = file_info.get('suffix','')
+            Parameters
+            fp: filepath
+            case_sensitive: Case Sensitive 
+            verbose: show detailed processing information
+            show_info: show result list of deleted files
+            input_file_ext_list: reference file list (= stem information)
+            delete_file_ext_list: file extension list that are to be deleted
+            delete: flag to really delete files (otherwise only list is shown)
+        """   
 
-#     for additional_suffix in additional_suffixes:
-#         file_exts.append((file_suffix+additional_suffix))
-#     file_exts = [*file_exts,*exts]
-#     file_stem = fileref[:-len(file_suffix)]
+        # only delete if all files with deletion extension are found
+        delete_only_complete = False
 
-#     for file_ext in file_exts:
-#         fileref_del = file_stem+file_ext
-#         file_info_del = Persistence.get_filepath_info(fileref_del)
-#         if file_info_del["exists"]:
-#             #print(fileref_del)
-#             fileref_delete_list.append(fileref_del)
-# len(fileref_delete_list)
+        if not case_sensitive:
+            input_file_ext_list = list(map(lambda e:e.lower(),input_file_ext_list))
+            delete_file_ext_list = list(map(lambda e:e.lower(),delete_file_ext_list))
 
-# except(OSError) as (errno, strerror, filename):
-# print "OSError [%d]: %s at %s" % (errno, strerror, filename)
-# import os
-# os.remove(file_location)            
+
+        deletion_list = []
+
+        for subpath,_,files in os.walk(fp):
+            
+            if verbose:
+                print(f"\n --- Directory {subpath} --- \n{', '.join(files)}")
+
+            file_dict = {}
+
+            for file in files:
+                if case_sensitive:
+                    file_dict[file] = file
+                else:
+                    file_dict[file] = file.lower()
+
+            for f_ref,f in file_dict.items():                
+
+                filepath = os.path.join(subpath,f_ref)
+                fileinfo = Persistence.get_filepath_info(filepath)
+                suffix = fileinfo["suffix"]
+                stem = fileinfo["stem"]
+
+                if not case_sensitive:
+                    suffix = suffix.lower()
+                    stem = stem.lower()
+                    
+                if not suffix in input_file_ext_list:
+                    continue
+                
+                # regex file stem ending with a deletion file extension
+                regex = stem+".*["+"|".join(delete_file_ext_list)+"]$"
+                
+                if verbose:
+                    print("regex",regex)
+                
+                files_found_deletion = [f2 for f2 in file_dict.values() if ( ( len(re.findall(regex, f2)) > 0))]
+                files_found_deletion = [(subpath,f2) for f2 in files_found_deletion]
+                
+                if verbose:
+                    print("FOUND",files_found_deletion)
+
+                if delete_only_complete and ( not ( len(files_found_deletion) == len(delete_file_ext_list) ) ):
+                    continue
+                
+                deletion_list.extend(files_found_deletion)
+
+        p_old = None        
+
+        for f_t in deletion_list:
+            p = f_t[0]
+            f = f_t[1]
+            f_ref = os.path.join(p,f)
+            
+            if not p_old == p:
+                p_old = p
+                if show_info:
+                    print(f"\n--- Path {p} ---")
+            
+            if os.path.isfile(f_ref):
+                if delete:
+                    try:
+                        os.remove(f_ref)
+                    except:
+                        print(traceback.format_exc())
+                        
+                if show_info:
+                    print(f"    * {f}")
+
+        return None 
