@@ -507,6 +507,8 @@ class Persistence:
             input_file_ext_list: reference file list (= stem information)
             delete_file_ext_list: file extension list that are to be deleted
             delete: flag to really delete files (otherwise only list is shown)
+            
+            returns None
         """   
 
         # only delete if all files with deletion extension are found
@@ -586,3 +588,93 @@ class Persistence:
                     print(f"    * {f}")
 
         return None 
+
+    @staticmethod
+    def copy_rename(fp,trg_path_root,regex_filter=None,regex_subst=None,s_subst="",debug=False,save=True):        
+        """  Recursively (from subpaths) copies files matching to regex name patterns and/or renames files 
+             Parameters
+             fp            : source path
+             trg_path_root : target path root
+             regex_filter  : file filter regex (if set to None, all files will be copied)
+             regex_subst   : regex for substitution (if set to None, nothing will be renamed)
+             s_subst       : substitution string
+             debug         : show debug information
+             save          : execute the operations. If false, changes are not saved
+             Returns None
+
+            Example regex
+            regex_filter = r"url|pdf$" # copies either url or pdf at the end
+            regex_subst = "(group)" # all strings "group" will be assignerd match group \1
+            s_subst = r"-- this is \1 --" "group" will be replaced by "-- this is group --"
+        
+        """
+
+        if debug:
+            print(f"--- PATH:   {fp} --- \n    TARGET: {trg_path_root}")
+            print(f"    FILTER: {regex_filter}")
+            print(f"    REPLACE PATTERN: {regex_subst} BY {s_subst}")
+
+        for subpath,_,files in os.walk(fp):
+
+            if debug:
+                print(f"\n    --- Processing Folder: {subpath} ---")    
+            
+            # copy file if possible
+            copy_file = True
+            add_trg_path = ""
+            
+            if trg_path_root is not None:        
+                # check if we process target paths
+                if trg_path_root == os.path.commonpath([subpath,trg_path_root]):            
+                    copy_file = False
+                    if debug:
+                        print(f"              Target Folder, files will not be copied")
+                
+                # get subdirectory for copy
+                add_trg_path = subpath[len(fp)+1:]
+                copy_path = os.path.join(trg_path_root,add_trg_path)
+                if debug and copy_file:
+                    print(f"              Copy Folder: {copy_path}")  
+            else:
+                copy_file = False
+            
+            for f in files:
+                
+                # filter file name
+                regex_search = re.findall(regex_filter,f)
+                
+                if len(regex_search) == 0:
+                    print(f"        - {f}")    
+                    continue
+                
+                fp_src = os.path.join(subpath,f)
+                
+                if copy_file:
+                    fp_trg = os.path.join(copy_path,f)
+                    if debug:
+                        print(f"        C {f} copied")  
+                    if save:
+                        try:
+                            shutil.copy2(fp_src, fp_trg)    
+                        except IOError:
+                            os.makedirs(os.path.dirname(fp_trg))
+                            shutil.copy2(fp_src, fp_trg)  
+                else:
+                    fp_trg = fp_src
+                    
+                # now rename file
+                if regex_subst is not None:
+                    f_subst = re.sub(regex_subst, s_subst, f,flags=re.IGNORECASE)
+                    if not f_subst == f:
+                        if debug:
+                            if not copy_file:
+                                print(f"        O    {f} (RENAME)")   
+                            print(f"        R -> {f_subst}")      
+                            fp_rename = os.path.join(os.path.dirname(fp_trg),f_subst)
+                        if save:
+                            if os.path.isfile(fp_rename):
+                                print(f"        E    {f_subst} exists, no rename")
+                            else:    
+                                os.rename(fp_trg, fp_rename)
+                
+        return None                
