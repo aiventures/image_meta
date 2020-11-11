@@ -641,11 +641,12 @@ class Persistence:
             for f in files:
                 
                 # filter file name
-                regex_search = re.findall(regex_filter,f)
+                if regex_filter is not None:
+                    regex_search = re.findall(regex_filter,f)
                 
-                if len(regex_search) == 0:
-                    print(f"        - {f}")    
-                    continue
+                    if len(regex_search) == 0:
+                        print(f"        - {f}")    
+                        continue
                 
                 fp_src = os.path.join(subpath,f)
                 
@@ -657,7 +658,7 @@ class Persistence:
                         try:
                             shutil.copy2(fp_src, fp_trg)    
                         except IOError:
-                            os.makedirs(os.path.dirname(fp_trg))
+                            os.makedirs(os.path.dirname(fp_trg),0o777)
                             shutil.copy2(fp_src, fp_trg)  
                 else:
                     fp_trg = fp_src
@@ -675,6 +676,5 @@ class Persistence:
                             if os.path.isfile(fp_rename):
                                 print(f"        E    {f_subst} exists, no rename")
                             else:    
-                                os.rename(fp_trg, fp_rename)
-                
+                                os.rename(fp_trg, fp_rename)      
         return None                
