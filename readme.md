@@ -17,5 +17,6 @@ The package contains the following modules:
 * **persistence.py** reading + writing plain + json files
 * **exif.py** exiftool interface + image metadata handling / transformation 
 * **util** datetime calculations, binary search in list, ...
+* **controller** bundling logic into helper methods ...
 
 Caveat: Mind the usage terms from Nominatim https://operations.osmfoundation.org/policies/nominatim/ ! So reverse search is only accceptable for a small amount of requests!
