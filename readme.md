@@ -19,4 +19,6 @@ The package contains the following modules:
 * **util** datetime calculations, binary search in list, ...
 * **controller** bundling logic into helper methods ...
 
+All features are showcased in a sample project using Jupyter Notebooks: [image_meta_sample](https://github.com/aiventures/image_meta_sample)
+
 Caveat: Mind the usage terms from Nominatim https://operations.osmfoundation.org/policies/nominatim/ ! So reverse search is only accceptable for a small amount of requests!
