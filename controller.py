@@ -63,6 +63,7 @@ class Controller(object):
     TEMPLATE_DEFAULT_LATLON_FILE_ACTIONS = "DEFAULT_LATLON_FILE_ACTIONS"
     TEMPLATE_CREATE_LATLON = "CREATE_LATLON"    
     TEMPLATE_CREATE_DEFAULT_LATLON = "CREATE_DEFAULT_LATLON"  
+    # TEMPLATE_CREATE_DEFAULT_LATLON = "DEFAULT_LATLON"  
     TEMPLATE_DEFAULT_MAP_DETAIL = "DEFAULT_MAP_DETAIL"
     TEMPLATE_DEFAULT_REVERSE_GEO = "DEFAULT_REVERSE_GEO"
     TEMPLATE_DEFAULT_META_EXT = "DEFAULT_META_EXT"   
@@ -297,6 +298,9 @@ class Controller(object):
         """
         geo_dict = {}
 
+        if debug:
+            print(f"--- Reverse Geo Search:\n    Reading {filepath} \n    from remote source: {remote}, save Data {save}")
+
         if filepath is None:
             file_exists = False
         else:
@@ -304,8 +308,6 @@ class Controller(object):
 
         if ( file_exists and (remote is False)):
             try:
-                if debug is True:
-                    print(f"reading geodata from {filepath}")
                 geo_dict = Persistence.read_json(filepath)
             except:
                 geo_dict = {}
@@ -313,7 +315,7 @@ class Controller(object):
         # read from nominatim reverse search
         if ((not geo_dict) and ( latlon is not None )): 
             if debug is True:
-                print(f"reading reverse geo data for latlon {latlon}")
+                print(f"    reading reverse geo data for latlon {latlon}")
             time.sleep(1) # graceful access to remote location
             geo_dict = Geo.geo_reverse_from_nominatim(latlon,zoom=zoom,debug=debug)
 
@@ -440,13 +442,19 @@ class Controller(object):
             save = False
             remote = False
 
-            if ( op_default_lat_lon in f_actions ):
+            if ( op_default_lat_lon in f_actions ) or (op_default_lat_lon == Persistence.MODE_CREATE) :
 
                 if op_default_lat_lon in Persistence.ACTIONS_CHANGE_FILE:
                     save = True
 
                     if not op_default_lat_lon == Persistence.MODE_DELETE:
                         remote = True
+                
+                # check if default geo file already exists
+                fp_info = Persistence.get_filepath_info(f)
+                if fp_info.get("is_file",False):
+                    save = False
+                    remote = False
 
                 # retrieve the nominatim data either from local file or from service
                 if not op_default_lat_lon == Persistence.MODE_DELETE:
@@ -458,8 +466,9 @@ class Controller(object):
 
             # file operations not possible
             else:
-                print(f"file {f} can be used: {is_file(Controller.TEMPLATE_CREATE_DEFAULT_LATLON)}")
-                print(f"file operation {op_default_lat_lon} ({Persistence.MODE_TXT.get(op_default_lat_lon)}), allowed values {f_actions}")
+                print(f"File {f}, allowed operations in profile {op_default_lat_lon} allowed file ops {f_actions}")
+                print(f"can be used: {is_file(Controller.TEMPLATE_CREATE_DEFAULT_LATLON)}")
+                print(f"file operation {op_default_lat_lon} ({Persistence.MODE_TXT.get(op_default_lat_lon)})")
 
         # get gpx file
         if is_file(Controller.TEMPLATE_GPX):
