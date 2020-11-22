@@ -460,7 +460,7 @@ class ExifTool(object):
         for arg in args:
             if not ( arg[0] == "-" ):
                 continue
-            key_raw,value_raw = arg.strip().split("=")
+            key_raw,value_raw = arg.strip().split("=",1)
             key = key_raw[1:len(key_raw)]
             
             if ( key in ExifTool.META_DATA_LIST ):

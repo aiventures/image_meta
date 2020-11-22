@@ -603,14 +603,19 @@ class Controller(object):
         
         # read data from file / from url
         reverse_geo = Controller.retrieve_nominatim_reverse(filepath=filepath_geo,latlon=latlon,save=save_latlon,
-                                                            zoom=geo_detail_level,remote=(not geo_exists),debug=debug)
+                                                            zoom=geo_detail_level,remote=(not geo_exists),debug=verbose)
 
         # if nothing found, fallback to default reverse geo data
         if ( not reverse_geo ) and default_reverse_geo:
-            if debug:
-                print("  ---- NO GPS DATA FOUND, WILL BE REPLACED BY DEFAULT GPS DATA ----")
             reverse_geo = default_reverse_geo
             latlon = default_reverse_geo.get("latlon",None)
+            if debug:
+                if latlon is None:
+                    osm_link = "<No Link>"
+                else:
+                    osm_link = Geo.latlon2osm(latlon)                
+                print(f"        Controller.augment_gps_data: NO GPS DATA FOUND,\n        WILL BE REPLACED BY DEFAULT GPS DATA with latlon {latlon} ")
+                print(f"        OSM {osm_link}")
 
         # return empty reverse geo
         if not ( reverse_geo ):
@@ -723,7 +728,7 @@ class Controller(object):
 
         for fileref,metadata_dict in img_meta_list.items():
 
-            creation_date = metadata_dict.get("CreateDate",None)
+            creation_date = metadata_dict.get("CreateDate",None)            
             creation_timestamp = Util.get_localized_datetime(dt_in=creation_date,tz_in=timezone,tz_out="UTC",
                                                              debug=False,as_timestamp=True) 
             if not ( creation_timestamp is None or gps_offset is None ):                                                 
@@ -744,6 +749,13 @@ class Controller(object):
                 timestamp_gpx = gpx_keys[timestamp_index]
                 datetime_gpx = datetime.utcfromtimestamp(timestamp_gpx)
                 geo_data = gpx[timestamp_gpx]
+            
+            if geo_data is None:
+                latlon = "<No Coordinates>"
+                osm_link = "<No Link>"
+            else:
+                latlon = (geo_data["lat"],geo_data["lon"])
+                osm_link = Geo.latlon2osm(latlon)
 
             # get technical keywords
             tech_keywords,tech_hierarchy = ExifTool.get_tech_keywords_from_metadict(metadata_dict,debug=verbose)
@@ -775,7 +787,7 @@ class Controller(object):
                                                          metadata=metadata_dict,overwrite_meta=overwrite_meta)
             
             # gps metadata
-            gps_data = Controller.augment_gps_data(fileref=fileref,geo_dict=geo_data,template_dict=params,metadata_dict=metadata_dict,utc_timestamp=creation_timestamp,debug=False) 
+            gps_data = Controller.augment_gps_data(fileref=fileref,geo_dict=geo_data,template_dict=params,metadata_dict=metadata_dict,utc_timestamp=creation_timestamp,debug=debug) 
 
             # gps keywords
             try:
@@ -805,16 +817,18 @@ class Controller(object):
             augmented_meta.update(gps_data)
 
             if debug:
-                print(f"\n --- File {fileref} \n          corrected timestamp {creation_timestamp} offset {gps_offset} corrected UTC {creation_datetime} ")
-                print(f"                GPS timestamp {timestamp_gpx} UTC {datetime_gpx} \n")     
+                print(f"\n--- Controller.prepare_img_write\n    File {fileref} ---")
+                print(f"       Corrected timestamp {creation_timestamp} offset {gps_offset}")
+                print(f"       Datetime IMG Creation {creation_date} Corrected (UTC) {creation_datetime} GPS (UTC) {datetime_gpx}")                    
+                print(f"                GPS timestamp {timestamp_gpx} UTC {datetime_gpx} latlon: {latlon}")   
+                print(f"                OSM {osm_link}")   
                 if verbose:
                     print("      METADATA STORED IN IMAGE")
                     Util.print_dict_info(d=metadata_dict) 
-                    print(f"      GEO Data: {geo_data}")
                     print(f"      Tech Keywords {tech_keywords}")     
                     print(f"      Default Keywords: {default_keywords}")    
                     print(f"      File Keywords: {file_keywords}")     
-                    print(f"      All Keywords:  {keywords}")   
+                    print(f"      All Keywords:  {keywords}")                       
                     print(f"      Hierarchy Keywords:  {hier_keywords}")   
                     print("      #### Augmented Metadata: ####\n")
                     Util.print_dict_info(d=augmented_meta) 
@@ -850,7 +864,7 @@ class Controller(object):
                 fp_info_suffix_len = len(Persistence.get_filepath_info(fileref).get("suffix",""))
                 fileref_meta = fileref[:(-fp_info_suffix_len)] + meta_ext
                 if debug:
-                    print(f"      Save metadata to {fileref_meta}")
+                    print(f"       Save {fileref_meta}")
                 try:
                     meta_txt = ExifTool.dict2arg(meta_dict=new_metadata)
                     if verbose:
@@ -917,3 +931,93 @@ class Controller(object):
             print(traceback.format_exc())
 
         return finished
+
+    @staticmethod
+    def show_file_data(fp_img,fp_exif_tool=None,fp_gpx=None,geo_ext="geo",meta_ext="meta"):
+        """ displays data as found in auxiliary files (gpx, metadata and geo data) for a given image """
+        
+        def print_file_info(in_dict,attributes=None,prefix=None,show_info=True):
+            out_dict = {}   
+
+            if prefix is not None:
+                prefix = prefix + "_"
+            else:
+                prefix = ""    
+
+            # show all values in attributes list if they exist
+            [out_dict.update({(prefix+k):in_dict.get(k,None)}) for k in attributes if in_dict.get(k,None) is not None]               
+
+            if show_info:
+                Util.print_dict_info(out_dict)        
+
+            return out_dict
+        
+        # attribute selection for image, meta and geo files
+        img_file_attributes = ["FileName","Directory","FileSize","FileModifyDate","FileCreateDate",
+                            "ModifyDate","DateTimeOriginal","CreateDate","Make","Model","LensMake",
+                            "LensModel","FocalLength","FNumber","ExposureTime","ScaleFactor35efl",
+                            "GPSVersionID","ScaleFactor35efl"]
+
+        meta_file_attributes = ["DateCreated","ImageDescription","Caption-Abstract","ObjectName",
+                                "SpecialInstructions","GPSLatitude","GPSLongitude","GPSDateStamp",
+                                "GPSTimeStamp","Keywords"]
+
+        geo_file_attributes = ["latlon","url_osm","url_geohack","nominatim_url","properties_category",
+                            "properties_addresstype","properties_display_name"]    
+        
+        file_info = Persistence.get_filepath_info(filepath=fp_img)    
+        file_parent = file_info.get("parent",None)
+        file_stem = file_info.get("stem",None)
+        file_geo = os.path.join(file_parent,(file_stem+"."+geo_ext))
+        file_meta = os.path.join(file_parent,(file_stem+"."+meta_ext))
+
+        if os.path.isfile(fp_exif_tool) and file_info["exists"]:
+            with ExifTool(fp_exif_tool) as exiftool:
+                # collects data of several files in one dictionary
+                try:
+                    meta_img = exiftool.get_metadict_from_img(fp_img)
+                    meta_dict = meta_img[list(meta_img.keys())[0]]
+                    date_created = meta_dict.get("CreateDate",None)
+                    datetime_created = Util.get_localized_datetime(date_created,as_timestamp=False)
+                    timestamp_created = Util.get_localized_datetime(date_created,as_timestamp=True)
+                except:
+                    print(f"error reading file {fp_img} check if it is there / has correct format")        
+                    meta_dict = None
+                    return
+        
+        if os.path.isfile(fp_gpx):
+            gpx = Persistence.read_gpx(gpsx_path=fp_gpx)
+            gpx_ts = sorted(list(gpx.keys()))
+            if isinstance(timestamp_created,int):
+                timestamp_gpx = gpx_ts[Util.get_nearby_index(timestamp_created,gpx_ts)]        
+                print(f"\n--- File: {file_info.get('filepath',None)}")
+                print(f"    Date/Datetime {date_created}/{datetime_created} \n    Timestamp image: {timestamp_created} timestamp gpx {timestamp_gpx} diff {timestamp_created-timestamp_gpx}")            
+                latlon = (gpx[timestamp_gpx]["lat"],gpx[timestamp_gpx]["lon"])
+                print("    "+Geo.latlon2osm(latlon))   
+            else:
+                print(f"Timestamp {timestamp_created} is not int, gpx file {fp_gpx} couldn't be read")
+        else:
+            print(f"gps data file {file_geo} doesn't exist")
+
+        if isinstance(meta_dict,dict):
+            print(f"\n    --- Image Metadata")
+            print_file_info(meta_dict,attributes=img_file_attributes,prefix="IMG",show_info=True)                  
+        else:
+            print(f"Image data for file {fp_img} doesn't exist")  
+            
+        if os.path.isfile(file_geo):
+            print(f"\n    --- Geo File")
+            geo_dict = Persistence.read_json(file_geo)
+            print_file_info(geo_dict,attributes=geo_file_attributes,prefix="GEO",show_info=True)                  
+        else:
+            print(f"Reverse geo data file {file_geo} doesn't exist")    
+            
+        if os.path.isfile(file_meta):
+            print(f"\n    --- Meta File")
+            metafile_raw = Persistence.read_file(file_meta)
+            meta_file_dict = ExifTool.arg2dict(args=metafile_raw)  
+            print_file_info(meta_file_dict,attributes=meta_file_attributes,prefix="META",show_info=True)                  
+        else:
+            print(f"Meta Data data file {file_meta} doesn't exist")  
+
+        return None
