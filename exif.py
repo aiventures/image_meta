@@ -413,7 +413,6 @@ class ExifTool(object):
             (test.jpg requires a test.args file )  
         """
 
-        #tbd 
         ext = [*img_ext,meta_ext]
         filerefs = Persistence.get_file_list(path=img_path,file_type_filter=ext)
 

@@ -900,11 +900,11 @@ class Controller(object):
 
         try:
             if showinfo:
-                print(f"\n##### 1/4 processs_images: GET PARAMS from {template_fileref}  #####\n")
+                print(f"\n##### step 1/4 processs_images: GET PARAMS from {template_fileref}  #####\n")
             control_params = Controller.read_params_from_file(filepath=template_fileref,showinfo=showinfo)
             
             if showinfo:
-                print("\n##### 2/4 processs_images: prepare execution #####\n")
+                print("\n##### step 2/4 processs_images: prepare execution #####\n")
             augmented_params = Controller.prepare_execution(template_dict=control_params,showinfo=showinfo)   
             
             exif_ref = augmented_params["EXIFTOOL"]
@@ -914,21 +914,21 @@ class Controller(object):
                 print(f"    EXIFTOOL: {exif_ref}\n    IMAGE PATH: {img_path}\n")            
 
             if showinfo:
-                print("\n##### 3/4 processs_images: prepare image write #####\n")            
+                print("\n##### step 3/4 processs_images: prepare image write #####\n")            
             Controller.prepare_img_write(params=augmented_params,debug=showinfo,verbose=verbose)
             
             if showinfo:
-                print("\n##### 4/4 processs_images: write images #####\n")
+                print("\n##### step 4/4 processs_images: write images #####\n")
             
             with ExifTool(executable=exif_ref) as e:
-                img_filerefs = e.write_args2img(img_path=img_path,show_info=showinfo)
-            
-            print(img_filerefs)
+                img_filerefs = e.write_args2img(img_path=img_path,show_info=showinfo)            
 
             finished = True
         except:
             print(f"\nException occured with Controller.process_images(fileref={template_fileref})")
             print(traceback.format_exc())
+
+        # todo cleanup 
 
         return finished
 
