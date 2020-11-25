@@ -885,52 +885,6 @@ class Controller(object):
         with ExifTool(executable=exif_ref) as e:
             img_file_refs = e.write_args2img(img_path=img_path,img_ext=img_ext,meta_ext=meta_ext,show_info=show_info)
         return img_file_refs
-    
-    @staticmethod
-    def process_images(template_fileref,showinfo=False,verbose=False,cleanup=False):
-        """ executes the whole workflow: read write parameters, write metadata and gps files, execute write to image files, cleanup  
-            Arguments
-            template_fileref: filepath to arguments file (as created by method create_param_template)
-            showinfo: show execution info
-            verbose: show detailed_info
-            cleanup: delete created artifact files
-        """
-        
-        finished = False
-
-        try:
-            if showinfo:
-                print(f"\n##### step 1/4 processs_images: GET PARAMS from {template_fileref}  #####\n")
-            control_params = Controller.read_params_from_file(filepath=template_fileref,showinfo=showinfo)
-            
-            if showinfo:
-                print("\n##### step 2/4 processs_images: prepare execution #####\n")
-            augmented_params = Controller.prepare_execution(template_dict=control_params,showinfo=showinfo)   
-            
-            exif_ref = augmented_params["EXIFTOOL"]
-            img_path = augmented_params["WORK_DIR"]
-
-            if showinfo:
-                print(f"    EXIFTOOL: {exif_ref}\n    IMAGE PATH: {img_path}\n")            
-
-            if showinfo:
-                print("\n##### step 3/4 processs_images: prepare image write #####\n")            
-            Controller.prepare_img_write(params=augmented_params,debug=showinfo,verbose=verbose)
-            
-            if showinfo:
-                print("\n##### step 4/4 processs_images: write images #####\n")
-            
-            with ExifTool(executable=exif_ref) as e:
-                img_filerefs = e.write_args2img(img_path=img_path,show_info=showinfo)            
-
-            finished = True
-        except:
-            print(f"\nException occured with Controller.process_images(fileref={template_fileref})")
-            print(traceback.format_exc())
-
-        # todo cleanup 
-
-        return finished
 
     @staticmethod
     def show_file_data(fp_img,fp_exif_tool=None,fp_gpx=None,geo_ext="geo",meta_ext="meta"):
@@ -1021,3 +975,66 @@ class Controller(object):
             print(f"Meta Data data file {file_meta} doesn't exist")  
 
         return None
+
+    @staticmethod
+    def process_images(template_fileref,showinfo=False,verbose=False,copy_dir=None,ext_list=None,delete=True):
+        """ executes the whole workflow: read write parameters, write metadata and gps files, execute write to image files, cleanup  
+            Arguments
+            template_fileref: filepath to arguments file (as created by method create_param_template)
+            showinfo: show execution info
+            verbose: show detailed_info
+            copy_dir: filepath where all metadata will be copied before cleanup
+            ext_list: list of file extensions for files that should be copied or should be cleaned up 
+            delete:really delete files otherwise only show delete results
+        """
+        
+        finished = False
+
+        try:
+            if showinfo:
+                print(f"\n##### step 1/4 processs_images: GET PARAMS from {template_fileref}  #####\n")
+            control_params = Controller.read_params_from_file(filepath=template_fileref,showinfo=showinfo)
+            
+            if showinfo:
+                print("\n##### step 2/4 processs_images: prepare execution #####\n")
+            augmented_params = Controller.prepare_execution(template_dict=control_params,showinfo=showinfo)   
+            
+            exif_ref = augmented_params["EXIFTOOL"]
+            img_path = augmented_params["WORK_DIR"]
+
+            if showinfo:
+                print(f"    EXIFTOOL: {exif_ref}\n    IMAGE PATH: {img_path}\n")            
+
+            if showinfo:
+                print("\n##### step 3/4 processs_images: prepare image write #####\n")            
+            Controller.prepare_img_write(params=augmented_params,debug=showinfo,verbose=verbose)
+            
+            if showinfo:
+                print("\n##### step 4/4 processs_images: write images #####\n")
+            
+            with ExifTool(executable=exif_ref) as e:
+                img_filerefs = e.write_args2img(img_path=img_path,show_info=showinfo)            
+
+            if isinstance(ext_list,list):        
+
+                # get input file extension
+                input_ext = augmented_params.get("IMG_EXTENSIONS",["jpg"])
+
+                if ( copy_dir is not None ): 
+                    if os.path.isdir(copy_dir):
+                        if showinfo:
+                            print(f"\n##### copy metadata files {ext_list} to {copy_dir} #####\n")                
+
+                if showinfo:
+                    print(f"\n##### finally: clean up metadata files with extension {ext_list}, delete: {delete} #####\n")                            
+                
+                Persistence.delete_related_files(fp=img_path,input_file_ext_list=input_ext,delete_file_ext_list=ext_list,
+                                                 delete=delete,verbose=False,show_info=showinfo)
+
+            finished = True
+
+        except:
+            print(f"\nException occured with Controller.process_images(fileref={template_fileref})")
+            print(traceback.format_exc())
+
+        return finished

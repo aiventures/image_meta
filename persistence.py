@@ -511,6 +511,13 @@ class Persistence:
             returns None
         """   
 
+        # initialize file lists
+        if not isinstance(input_file_ext_list,list):
+            input_file_ext_list = []
+        
+        if not isinstance(delete_file_ext_list,list):
+            delete_file_ext_list = []
+
         # only delete if all files with deletion extension are found
         delete_only_complete = False
 
@@ -518,8 +525,10 @@ class Persistence:
             input_file_ext_list = list(map(lambda e:e.lower(),input_file_ext_list))
             delete_file_ext_list = list(map(lambda e:e.lower(),delete_file_ext_list))
 
-
         deletion_list = []
+
+        if show_info:
+            print(f"Input file extension: {input_file_ext_list} File Deletion extensions {delete_file_ext_list} ")
 
         for subpath,_,files in os.walk(fp):
             
@@ -549,21 +558,19 @@ class Persistence:
                     continue
                 
                 # regex file stem ending with a deletion file extension
-                regex = stem+".*["+"|".join(delete_file_ext_list)+"]$"
+                if len(delete_file_ext_list) > 0:
+                    regex = stem+".("+"|".join(delete_file_ext_list)+")$"
                 
-                if verbose:
-                    print("regex",regex)
+                    if verbose:
+                        print("regex",regex)
                 
-                files_found_deletion = [f2 for f2 in file_dict.values() if ( ( len(re.findall(regex, f2)) > 0))]
-                files_found_deletion = [(subpath,f2) for f2 in files_found_deletion]
-                
-                if verbose:
-                    print("FOUND",files_found_deletion)
+                    files_found_deletion = [f2 for f2 in file_dict.values() if ( ( len(re.findall(regex, f2)) > 0))]
+                    files_found_deletion = [(subpath,f2) for f2 in files_found_deletion]
 
-                if delete_only_complete and ( not ( len(files_found_deletion) == len(delete_file_ext_list) ) ):
-                    continue
+                    if delete_only_complete and ( not ( len(files_found_deletion) == len(delete_file_ext_list) ) ):
+                        continue
                 
-                deletion_list.extend(files_found_deletion)
+                    deletion_list.extend(files_found_deletion)
 
         p_old = None        
 
@@ -575,7 +582,7 @@ class Persistence:
             if not p_old == p:
                 p_old = p
                 if show_info:
-                    print(f"\n--- Path {p} ---")
+                    print(f"\n--- DELETE FILES: Path {p} ---")
             
             if os.path.isfile(f_ref):
                 if delete:
@@ -585,7 +592,7 @@ class Persistence:
                         print(traceback.format_exc())
                         
                 if show_info:
-                    print(f"    * {f}")
+                    print(f"    * DELETE {f}")
 
         return None 
 
