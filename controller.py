@@ -977,15 +977,16 @@ class Controller(object):
         return None
 
     @staticmethod
-    def process_images(template_fileref,showinfo=False,verbose=False,copy_dir=None,ext_list=None,delete=True):
+    def process_images(template_fileref,showinfo=False,verbose=False,copy_dir=None,copy_ext_list=None,del_ext_list=None,persist=True):
         """ executes the whole workflow: read write parameters, write metadata and gps files, execute write to image files, cleanup  
             Arguments
             template_fileref: filepath to arguments file (as created by method create_param_template)
             showinfo: show execution info
             verbose: show detailed_info
             copy_dir: filepath where all metadata will be copied before cleanup
-            ext_list: list of file extensions for files that should be copied or should be cleaned up 
-            delete:really delete files otherwise only show delete results
+            copy_ext_list: list of file extensions for files that should be copied
+            del_ext_list: list of file extensions for files that should be deleted
+            persist:really delete & copy files otherwise only show processing results
         """
         
         finished = False
@@ -1015,21 +1016,24 @@ class Controller(object):
             with ExifTool(executable=exif_ref) as e:
                 img_filerefs = e.write_args2img(img_path=img_path,show_info=showinfo)            
 
-            if isinstance(ext_list,list):        
-
-                # get input file extension
-                input_ext = augmented_params.get("IMG_EXTENSIONS",["jpg"])
-
-                if ( copy_dir is not None ): 
-                    if os.path.isdir(copy_dir):
-                        if showinfo:
-                            print(f"\n##### copy metadata files {ext_list} to {copy_dir} #####\n")                
+            if isinstance(copy_ext_list,list) and ( copy_dir is not None ): 
+                regex_filter = ("|".join(copy_ext_list))+"$"
 
                 if showinfo:
-                    print(f"\n##### finally: clean up metadata files with extension {ext_list}, delete: {delete} #####\n")                            
+                    print(f"\n##### step: copy metadata files matching  ( {regex_filter} ) \n      to {copy_dir}, filter: {regex_filter} #####\n")                
+
+                Persistence.copy_rename(fp=img_path,trg_path_root=copy_dir,regex_filter=regex_filter,debug=showinfo,save=persist)                  
+
+            if isinstance(del_ext_list,list):        
+
+                # get input file extension
+                input_ext = augmented_params.get("IMG_EXTENSIONS",["jpg"])  
+
+                if showinfo:
+                    print(f"\n##### finally: clean up metadata files with extension {del_ext_list}, persisted: {persist} #####\n")                            
                 
-                Persistence.delete_related_files(fp=img_path,input_file_ext_list=input_ext,delete_file_ext_list=ext_list,
-                                                 delete=delete,verbose=False,show_info=showinfo)
+                Persistence.delete_related_files(fp=img_path,input_file_ext_list=input_ext,delete_file_ext_list=del_ext_list,
+                                                 delete=persist,verbose=False,show_info=showinfo)
 
             finished = True
 
