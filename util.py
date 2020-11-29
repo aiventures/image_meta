@@ -244,6 +244,7 @@ class Util:
             verbose: if true returns a detailed dictionary of calculations date object otherwise
             showinfo: show information
             Returns: Date or Info Dictionary of Easter Sunday
+            Reference: https://www.tondering.dk/claus/cal/easter.php 
         """
         G = ( year % 19 ) + 1
         epact_julian = (11*(G-1)) % 30 # epact in julian calendar
