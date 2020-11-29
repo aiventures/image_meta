@@ -301,3 +301,59 @@ class Util:
             return d_easter_dict
         else:
             return d_easter                
+
+    @staticmethod
+    def get_holiday_dates(year:int,show_info=False):
+        """ Calculates holiday dates for Badenwürttemberg for given year """
+
+        holiday_list = {"Neujahr":{"month":1,"day":1,"holiday":1},
+                        "Dreikönig":{"month":1,"day":6,"holiday":1},
+                        "Rosenmontag":{"holiday":0,"offset":-48},
+                        "Aschermittwoch":{"holiday":0,"offset":-46},
+                        "Karfreitag":{"holiday":1,"offset":-2},
+                        "Ostersonntag":{"holiday":0,"offset":0},
+                        "Ostermontag":{"holiday":1,"offset":1},
+                        "1.Mai":{"month":5,"day":1,"holiday":1},
+                        "Himmelfahrt":{"holiday":1,"offset":39},
+                        "Pfingstsonntag":{"holiday":0,"offset":49},
+                        "Pfingstmontag":{"holiday":1,"offset":50},
+                        "Fronleichnam":{"holiday":1,"offset":60},        
+                        "Dt Einheit":{"month":10,"day":3,"holiday":1},
+                        "Allerheiligen":{"month":11,"day":1,"holiday":1},
+                        "Heiligabend":{"month":12,"day":24,"holiday":1},
+                        "1.Weihnachtstag":{"month":12,"day":25,"holiday":1},
+                        "2.Weihnachtstag":{"month":12,"day":26,"holiday":1},
+                        "Silvester":{"month":12,"day":31,"holiday":1}}
+                        
+        d_easter = Util.get_easter_sunday(year)
+
+        out_dict ={}
+        num_holidays = 0
+
+        if show_info:
+            print(f"\n--- Holiday Days for year {year} ---")
+
+        for h,v in holiday_list.items():
+            # check if it is a fixed holiday
+            offset = holiday_list[h].get("offset",None)        
+            if offset is None:
+                d_holiday = date(year,v["month"],v["day"])
+            else:
+                d_holiday = d_easter + timedelta(days=v["offset"])
+            
+            weekday = d_holiday.isoweekday()    
+            v["weekday"] = weekday
+            v["year"] = year
+            v["d"] = d_holiday
+            v["name"] = h    
+            if weekday >= 6:
+                v["holiday"] = 0
+            out_dict[d_holiday] = v
+            
+            if show_info:
+                num_holidays += v["holiday"]
+                print(f"{d_holiday.strftime('%Y-%B-%d (%A)')}: {h} ({v['holiday']})")
+        if show_info:
+            print(f"--- Number of Holiday Days {year}: {num_holidays} ---")
+        
+        return out_dict
