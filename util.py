@@ -1,5 +1,6 @@
 import re
 from datetime import datetime
+from datetime import date
 from datetime import timedelta
 from dateutil.parser import parse
 from dateutil.tz import tzutc
@@ -234,3 +235,68 @@ class Util:
                 print(s)
             else:
                 print(f"{sp}{k}  ->   {v}")
+
+    @staticmethod
+    def get_easter_sunday(year:int,verbose=False,showinfo=False):
+        """ Calculates easter sunday
+            Arguments
+            year: Year 
+            verbose: if true returns a detailed dictionary of calculations date object otherwise
+            showinfo: show information
+            Returns: Date or Info Dictionary of Easter Sunday
+        """
+        G = ( year % 19 ) + 1
+        epact_julian = (11*(G-1)) % 30 # epact in julian calendar
+        C = ( year // 100 ) + 1 # century
+        S = (3*C) // 4 # solar equation, difference Julian vs. Gregorian
+        L = (8*C+5) // 25 # Lunar Equation, difference between the Julian calendar and the Metonic cycle.  
+
+        # Gregorian EPact
+        # The number 8 is a constant that calibrates the starting point of the Gregorian Epact so 
+        # that it matches the actual age of the moon on new year’s day.
+        epact_gregorian = ( epact_julian - S + L + 8 )
+        
+        # adjust so that gregorian epact is within range of 1 to 30
+        if epact_gregorian == 0:
+            epact_gregorian = 30
+        elif ( epact_gregorian > 30 ) or ( epact_gregorian < 0):
+            epact_gregorian = epact_gregorian % 30
+                
+        # now calculate paschal full moon
+        if epact_gregorian < 24:
+            d_fm = date(year, 4, 12)
+            d_offset = epact_gregorian - 1 
+        else:    
+            d_fm = date(year, 4, 18)
+            d_offset = epact_gregorian % 24
+            if epact_gregorian > 25:
+                d_offset -= 1
+            # April 18 otherwise April 17
+            elif ( epact_gregorian == 25 ) and ( G < 11 ):
+                d_offset -= 1
+                
+        d_fm = d_fm - timedelta(days=d_offset)
+        d_weekday = d_fm.isoweekday()
+        
+        # offset calculate nex sunday / in case its a sunday it will be follow up sunday
+        d_e_offset = 7 - ( d_weekday % 7 )
+        d_easter = d_fm + timedelta(days=d_e_offset)
+        if showinfo:   
+            print(f" {year}|G:{str(G).zfill(2)} Epact:{str(epact_gregorian).zfill(2)}|C:{C} S:{S} L:{L}"+
+                f"|F.Moon {d_fm}-{d_fm.strftime('%a')}|Eastern {d_easter}/{d_easter.strftime('%a')}|")
+        
+        # Return Easter Sunday either as date only or as detailed dictionary
+        if verbose:
+            d_easter_dict = {}
+            d_easter_dict["golden_number"] = G
+            d_easter_dict["epact_julian"] = epact_julian
+            d_easter_dict["century"] = C
+            d_easter_dict["solar_equation"] = S
+            d_easter_dict["lunar_equation"] = L
+            d_easter_dict["epact_gregorian"] = epact_gregorian
+            d_easter_dict["date_full_moon"] = d_fm
+            d_easter_dict["isoweekday_full_moon"] = d_weekday
+            d_easter_dict["date_eastern"] = d_easter        
+            return d_easter_dict
+        else:
+            return d_easter                
