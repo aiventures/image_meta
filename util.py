@@ -5,6 +5,7 @@ from datetime import timedelta
 from dateutil.parser import parse
 from dateutil.tz import tzutc
 from dateutil.tz import tzoffset
+from math import ceil
 import pytz
 
 class Util:
@@ -357,3 +358,78 @@ class Util:
             print(f"--- Number of Holiday Days {year}: {num_holidays} ---")
         
         return out_dict
+
+    @staticmethod
+    def is_leap_year(y):
+        """ check whether year is leap year """
+        ly = False
+        
+        if ( y % 4 == 0 ) and not ( y % 100 == 0 ):
+            ly = True
+
+        if ( y % 100 == 0 ) and not ( y % 400 == 0 ):
+            ly = False
+
+        if ( y % 400 == 0 ):
+            ly = True
+
+        return ly        
+
+    @staticmethod
+    def get_1st_isoweek_date(y:int):
+        """ returns monday date of first isoweek of a given calendar year 
+            https://en.wikipedia.org/wiki/ISO_week_date
+            W01 is the week containing 1st Thursday of the Year    
+        """
+        d_jan1 = date(y,1,1)
+        wd_jan1 = d_jan1.isoweekday()
+        # get the monday of this week
+        d_monday_w01 = d_jan1 - timedelta(days=(wd_jan1-1))
+        # majority of days in new calendar week
+        if wd_jan1 > 4:
+            d_monday_w01 += timedelta(days=7)
+            
+        return d_monday_w01
+
+    @staticmethod
+    def get_isoweekyear(y:int):
+        """" returns isoweek properties for given calendar year as dictionary:
+            1st and last monday of isoweek year, number of working weeks
+        """
+        d_first = Util.get_1st_isoweek_date(y)
+        d_last = Util.get_1st_isoweek_date(y+1) 
+        working_weeks = (d_last - d_first).days // 7
+        d_last = Util.get_1st_isoweek_date(y+1) - timedelta(days=7)
+        isoweekyear = {}
+        isoweekyear["first_monday"] = d_first
+        isoweekyear["last_monday"] = d_last
+        isoweekyear["last_day"] = d_last + timedelta(days=6)
+        isoweekyear["weeks"] = working_weeks
+        isoweekyear["year"] = y
+
+        return isoweekyear        
+
+    @staticmethod
+    def isoweek(d:date):
+        """" returns isoweek (isoweek,calendar year,number of passed days in calendar year) for given date """
+        y = d.year
+        
+        wy = Util.get_isoweekyear(y)
+        
+        # check if date is in boundary of current calendar year    
+        if ( d < wy["first_monday"] ):
+            wy = Util.get_isoweekyear(y-1)
+        elif ( d > wy["last_day"] ):
+            wy = Util.get_isoweekyear(y+1)
+            
+        iso = {}
+        iso["year"] = wy["year"]
+        iso["leap_year"] = Util.is_leap_year(wy["year"])
+        iso["weeks_year"] = wy["weeks"]    
+        iso["day_in_year"] = ( d - wy["first_monday"]).days + 1
+        iso["calendar_week"] = ceil( iso["day_in_year"] / 7 ) 
+        iso["weekday"] = d.isoweekday()
+        
+        return iso
+
+    
