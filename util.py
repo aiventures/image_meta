@@ -168,13 +168,14 @@ class Util:
         """ returns index for closest value in a sorted list for a given input value,
             uses binary search
         """
-        
+
         idx = -1
         idx_min = 0
         idx_max = len(sorted_list)
         idx_old = -2
 
-        if value is None:
+        if ((value is None) or
+           (isinstance(sorted_list,list) and len(sorted_list) == 0)):
             return Util.NOT_FOUND
         
         finished = False

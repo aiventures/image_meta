@@ -7,6 +7,8 @@ from xml.dom import minidom
 import pytz
 import shutil
 import re
+import time
+import os.path
 from xml.dom import minidom
 from datetime import datetime
 from pathlib import Path
@@ -49,9 +51,10 @@ class Persistence:
     FILEINFO_SUFFIX = "suffix"
     FILEINFO_IS_DIR = "is_dir"
     FILEINFO_IS_FILE = "is_file"  
-    FILEINFO_EXISTING_APRENT = "existing_parent"  
     FILEINFO_OBJECT = "object"  
     FILEINFO_ACTIONS = "actions"  
+    FILEINFO_CREATED_ON = "created_on"
+    FILEINFO_CHANGED_ON = "changed_on"
 
     # regex pattern for a raw file name: 3 letters 5 decimals
     REGEX_RAW_FILE_NAME = r"[a-zA-Z]{3}\d{5}"
@@ -476,6 +479,10 @@ class Persistence:
         if fileinfo[Persistence.FILEINFO_IS_FILE]:
             fileinfo[Persistence.FILEINFO_OBJECT]  = Persistence.OBJECT_FILE
             fileinfo[Persistence.FILEINFO_ACTIONS] = Persistence.ACTIONS_FILE
+            date_changed = datetime.fromtimestamp(int(os.path.getmtime(fileinfo[Persistence.FILEINFO_FILEPATH])))
+            date_created = datetime.fromtimestamp(int(os.path.getctime(fileinfo[Persistence.FILEINFO_FILEPATH])))
+            fileinfo[Persistence.FILEINFO_CHANGED_ON] = date_changed
+            fileinfo[Persistence.FILEINFO_CREATED_ON] = date_created
 
         # create potentially new folder name / file name
         if ( fileinfo[Persistence.FILEINFO_EXISTING_PARENT] is not None and fileinfo[Persistence.FILEINFO_OBJECT] is None):
