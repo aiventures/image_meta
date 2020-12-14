@@ -210,7 +210,7 @@ class Controller(object):
         return fp
     
     @staticmethod
-    def read_params_from_file(filepath=None,showinfo=True):
+    def read_params_from_file(filepath=None,showinfo=True,work_dir=None):
         """ reads control parameters from file and returns them
             as dictionary """
 
@@ -225,11 +225,17 @@ class Controller(object):
         
         params_raw = Persistence.read_json(filepath)
 
-        work_dir = params_raw.get("WORK_DIR")
-        if work_dir is not None:
-            if not os.path.isdir(work_dir):
-                print(f"Read Params: Work Dir {work_dir} is not a valid path, check config file {filepath}")
-                work_dir = ""
+        if (work_dir is not None) and (os.path.isdir(work_dir)):
+            if showinfo:
+                print(f" Working Directory Path Supplied Externally {work_dir}")
+            work_dir = work_dir
+        else:
+            work_dir = params_raw.get("WORK_DIR")
+        
+            if work_dir is not None:
+                if not os.path.isdir(work_dir):
+                    print(f"Read Params: Work Dir {work_dir} is not a valid path, check config file {filepath}")
+                    work_dir = ""
         
         control_params["WORK_DIR"] = work_dir
         
@@ -379,11 +385,18 @@ class Controller(object):
                 meta_raw = Persistence.read_file(f)
                 meta = ExifTool.arg2dict(meta_raw)
             except:
-                meta = {}
+                meta = {}   
 
         input_dict[Controller.TEMPLATE_META] = meta
 
         # copy single template parameters with default values
+        input_dict[Controller.TEMPLATE_COPYRIGHT]  = template_dict.get(Controller.TEMPLATE_COPYRIGHT,"Unknown Author")
+        input_dict[Controller.TEMPLATE_COPYRIGHT_NOTICE]  = template_dict.get(Controller.TEMPLATE_COPYRIGHT_NOTICE,"Unknown Author")
+        input_dict[Controller.TEMPLATE_CREDIT]  = template_dict.get(Controller.TEMPLATE_COPYRIGHT,"Unknown Author")
+        input_dict[Controller.TEMPLATE_SOURCE]  = template_dict.get(Controller.TEMPLATE_SOURCE,"Own Photography")
+        input_dict[Controller.TEMPLATE_WRITER_EDITOR]  = template_dict.get(Controller.TEMPLATE_COPYRIGHT,"Unknown Author")
+        input_dict[Controller.TEMPLATE_CAPTION_WRITER]  = template_dict.get(Controller.TEMPLATE_COPYRIGHT,"Unknown Author")
+
         input_dict[Controller.TEMPLATE_OVERWRITE_KEYWORD]  = template_dict.get(Controller.TEMPLATE_OVERWRITE_KEYWORD,False)
         input_dict[Controller.TEMPLATE_OVERWRITE_META]  = template_dict.get(Controller.TEMPLATE_OVERWRITE_META,False)
         tz = template_dict.get(Controller.TEMPLATE_TIMEZONE,"Europe/Berlin")
@@ -509,9 +522,6 @@ class Controller(object):
     @staticmethod
     def augment_meta_data(metadata_list:list,metadata_default_dict:dict,metadata:dict,overwrite_meta=False)->dict:
         """ select the metadata value either from file, template or metadata template """
-        
-        # metadata_default_dict > template meta data 
-        # metadata > from file / will be left as is / nothing required / shown here only for debugging
 
         augmented_meta = {}
 
@@ -604,6 +614,9 @@ class Controller(object):
         # read data from file / from url
         reverse_geo = Controller.retrieve_nominatim_reverse(filepath=filepath_geo,latlon=latlon,save=save_latlon,
                                                             zoom=geo_detail_level,remote=(not geo_exists),debug=verbose)
+        
+        if debug:
+            print(f"        Controller.augment_gps_data, latlon Coordinates: {latlon}")
 
         # if nothing found, fallback to default reverse geo data
         if ( not reverse_geo ) and default_reverse_geo:
@@ -698,6 +711,10 @@ class Controller(object):
         default_iptc["WebStatement"] = {"template":web_statement,"meta":default_meta.get('WebStatement',None) } 
         default_iptc["UsageTerms"] = {"template":usage_terms,"meta":default_meta.get('UsageTerms',None) } 
         default_iptc["URL"] = {"template":url_ref,"meta":default_meta.get('URL',None) } 
+        
+        if verbose:
+            print(f" --- Controller.prepare_img_write / SHOW DEFAULT IPTC PARAMS ----\n")
+            Util.print_dict_info(default_iptc)
 
         if not gpx is None:
             gpx_keys = sorted(gpx.keys())
@@ -727,6 +744,8 @@ class Controller(object):
 
 
         for fileref,metadata_dict in img_meta_list.items():
+            if debug:
+                print(f"\n--- Controller.prepare_img_write BEGIN \n    PROCESS {fileref}")
 
             creation_date = metadata_dict.get("CreateDate",None)            
             creation_timestamp = Util.get_localized_datetime(dt_in=creation_date,tz_in=timezone,tz_out="UTC",
@@ -817,7 +836,7 @@ class Controller(object):
             augmented_meta.update(gps_data)
 
             if debug:
-                print(f"\n--- Controller.prepare_img_write\n    File {fileref} ---")
+                print(f"\n    >> FILE {fileref}")
                 print(f"       Corrected timestamp {creation_timestamp} offset {gps_offset}")
                 print(f"       Datetime IMG Creation {creation_date} Corrected (UTC) {creation_datetime} GPS (UTC) {datetime_gpx}")                    
                 print(f"                GPS timestamp {timestamp_gpx} UTC {datetime_gpx} latlon: {latlon}")   
@@ -873,6 +892,9 @@ class Controller(object):
                 except:
                     print(f"Exception with file {fileref_meta}, processing will be skipped")
                     print(traceback.format_exc())
+
+            if debug:
+                print(f"\n    PROCESSING {fileref} \n--- Controller.prepare_img_write END")
         
         return None
 
@@ -977,7 +999,8 @@ class Controller(object):
         return None
 
     @staticmethod
-    def process_images(template_fileref,showinfo=False,verbose=False,copy_dir=None,copy_ext_list=None,del_ext_list=None,persist=True):
+    def process_images(template_fileref,showinfo=False,verbose=False,copy_dir=None,copy_ext_list=None,del_ext_list=None,
+                       persist=True,work_dir=None):
         """ executes the whole workflow: read write parameters, write metadata and gps files, execute write to image files, cleanup  
             Arguments
             template_fileref: filepath to arguments file (as created by method create_param_template)
@@ -987,6 +1010,7 @@ class Controller(object):
             copy_ext_list: list of file extensions for files that should be copied
             del_ext_list: list of file extensions for files that should be deleted
             persist:really delete & copy files otherwise only show processing results
+            work_dir: directly pass over work dir (can be used for external programs)
         """
         
         finished = False
@@ -994,7 +1018,7 @@ class Controller(object):
         try:
             if showinfo:
                 print(f"\n##### step 1/4 processs_images: GET PARAMS from {template_fileref}  #####\n")
-            control_params = Controller.read_params_from_file(filepath=template_fileref,showinfo=showinfo)
+            control_params = Controller.read_params_from_file(filepath=template_fileref,showinfo=showinfo,work_dir=work_dir)
             
             if showinfo:
                 print("\n##### step 2/4 processs_images: prepare execution #####\n")
