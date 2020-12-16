@@ -379,8 +379,16 @@ class Controller(object):
          
         # get default metadata (keyword and others) from file
         meta = {}
-        if  is_file(Controller.TEMPLATE_META):
+
+        if  is_file(Controller.TEMPLATE_META):            
             f = template_dict[(Controller.TEMPLATE_META+"_FILE")]
+
+            if not(os.path.isabs(f)):
+                f = os.path.join(work_dir,f)         
+            
+            if showinfo:
+                print(f"--- EXIF Metadata file: {f}")
+
             try:
                 meta_raw = Persistence.read_file(f)
                 meta = ExifTool.arg2dict(meta_raw)
