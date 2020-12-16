@@ -1,4 +1,3 @@
-
 from math import pi
 from math import sin
 from math import sqrt
@@ -10,6 +9,7 @@ from image_meta.persistence import Persistence
 from datetime import datetime
 from datetime import timedelta
 import requests
+import traceback
 
 class Geo:
     """ Geo calculations"""
@@ -126,11 +126,36 @@ class Geo:
         coords = ((lat_f*(coords_geo[0]+(coords_geo[1]/60)+(coords_geo[2]/3600)))
                  ,(lon_f*(coords_geo[3]+(coords_geo[4]/60)+(coords_geo[5]/3600))))
         return coords
-    
+
+    @staticmethod
+    def latlon_from_osm_url(url:str):
+        """ extracts latlon information from an osm link 
+            https://www.openstreetmap.org/#map=xx/lat/lon
+        """
+        url_osm = "https://www.openstreetmap.org/#map="
+        latlon = None
+        if not(isinstance(url,str) and url.startswith(url_osm) ):
+            return None
+        
+        try:
+            #extract latlon info as float number
+            latlon = list(map(float,url[len(url_osm):].split("/")[1:]))
+            if isinstance(latlon,list) and (len(latlon)!=2):
+                latlon = None
+        except Exception:
+            print(f"--- EXCEPTION latlon_from_osm_url: {url} ---")
+            print(traceback.format_exc())    
+            return None
+        
+        return latlon
+
     @staticmethod 
     def latlon2osm(latlon,detail=18):
         """ converts latlon to osm url """
         # https://www.openstreetmap.org/#map=<detail>/<lat>/<lon>
+        if not(isinstance(latlon,list) or isinstance(latlon,tuple)):
+            return None
+
         detail = str(detail)
         lat = str(latlon[0])
         lon = str(latlon[1])
