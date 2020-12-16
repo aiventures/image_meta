@@ -9,6 +9,7 @@ import shutil
 import re
 import time
 import os.path
+from configparser import ConfigParser
 from xml.dom import minidom
 from datetime import datetime
 from pathlib import Path
@@ -691,4 +692,135 @@ class Persistence:
                                 print(f"        E    {f_subst} exists, no rename")
                             else:    
                                 os.rename(fp_trg, fp_rename)      
-        return None                
+        return None
+
+    @staticmethod
+    def read_internet_shortcut(f,showinfo=False):
+        """ reads an Internet shortcut from filepath, returns the url or None 
+            if nothing could be found"""
+        url = None
+        cp = ConfigParser(interpolation=None)
+        
+        try:
+            cp.read(f)
+        except Exception as ex:
+            print(f"--- EXCEPTION read_internet_shortcut:{ex} ---")
+            print(traceback.format_exc())    
+            return None
+        
+        sections = cp.sections()
+
+        for section in sections:
+            options = cp.options(section)
+            if showinfo:
+                print('Section:', section)
+                print('- Options:', options)            
+
+            for option in options:
+                v = cp.get(section,option)
+                if showinfo:
+                    print(f" {option} : {v}")
+                if (section=="InternetShortcut") and (option=="url"):
+                    url = v
+
+        return url  
+
+    @staticmethod
+    def copy_meta_files(fp=None,fp_src=None,metadata="metadata.tpl",
+                        files_copy=["metadata_exif.tpl","metadata.tpl"],
+                        save=True,showinfo=False):
+        """ copies files into 1st level folders of a given path
+            - will not overwrite existing files
+            - additional feature metafile is assumed to be of type json
+            containing metadata value DEFAULT_LATLON
+            - if weblinks to OSM coordinates are found in the same path,
+            DEFAULT_LATLON values will be overwritten in metadta file
+            Parameters
+            ----------
+            fp : str
+                root filepath
+            fp_src : str
+                filepath containing files to copy
+            metadata : str
+                metadata filename
+            files_copy : list
+                files to be copies
+            save : boolean
+                flag if data are to be saved or only simulated
+            showinfo : boolean
+                flag whether to show processing information
+            Returns
+            ----------
+            boolean: flag whether all was executed
+        """
+        
+        from image_meta.geo import Geo
+
+        # only valid files to copy 
+        files_copy = list(filter(lambda f:os.path.isfile(os.path.join(fp_src,f)), files_copy))
+        if showinfo:
+            print(f"Files from {fp_src} to Copy:\n {files_copy}")
+        root_subdirs = []   
+        
+        for subpath,subdirs,files in os.walk(fp):
+            # only process direct parents
+            if subpath == fp:
+                if showinfo:
+                    print(f"\n*** subpath {subpath} ***\n")
+
+                root_subdirs = subdirs
+                for subdir in subdirs:
+                    absolute_path = os.path.join(subpath,subdir)
+                    if showinfo:
+                        print(f"* subdir {absolute_path}")
+                    if ( absolute_path == fp_src ):
+                        continue
+
+                    for f in files_copy:
+                        # get source file
+                        src_fp = os.path.join(fp_src,f)
+                        trg_fp = os.path.join(absolute_path,f)
+                        if not(os.path.isfile(trg_fp)):
+                            if showinfo:
+                                print(f"         Copy {f}")
+                            if save :
+                                shutil.copy(src_fp,trg_fp)
+            else:
+                # ignore folder with config files
+                if subpath == fp_src:
+                    continue
+                # process subfolder containing metadata and links
+                if metadata in files:
+                    link_files = list(filter(lambda f:f.endswith("url"),files))
+                    if len(link_files) == 0:
+                        continue
+                    if showinfo:
+                        print(f"   --- Subpath {subpath} contains LINKS ---")
+                        print(f"   Link files: {link_files}") 
+                    latlon = None
+                    # check whether any file contains an osm link    
+                    for link_file in link_files:
+                        link_path = os.path.join(subpath,link_file)
+                        if latlon is not None:
+                            continue
+                        url = Persistence.read_internet_shortcut(link_path)
+                        if url is not None:
+                            latlon = Geo.latlon_from_osm_url(url)
+                            if latlon is not None and showinfo:
+                                print(f"   Coordinates found {latlon}")
+                    # no coordinates for update
+                    if latlon is None:
+                        continue
+                    # read metadata configuration
+                    metadata_fp = os.path.join(subpath,metadata)
+                    # config data
+                    metadata_dict = Persistence.read_json(metadata_fp)
+                    default_latlon = metadata_dict.get("DEFAULT_LATLON",None)
+                    if showinfo:
+                        print(f"   Change latlon from {default_latlon} to {latlon}")
+                    metadata_dict["DEFAULT_LATLON"] = latlon
+                    if save:
+                        Persistence.save_json(metadata_fp,metadata_dict)
+                        if showinfo:
+                            print(f"   Update of file {metadata_fp}")
+        return True              
