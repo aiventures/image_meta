@@ -823,4 +823,4 @@ class Persistence:
                         Persistence.save_json(metadata_fp,metadata_dict)
                         if showinfo:
                             print(f"   Update of file {metadata_fp}")
-        return True              
+        return True

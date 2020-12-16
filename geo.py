@@ -381,4 +381,3 @@ class Geo:
             print(f"no gps points found in vicinity of {dist_min} m")        
         
         return gps_min
-
