@@ -824,3 +824,73 @@ class Persistence:
                         if showinfo:
                             print(f"   Update of file {metadata_fp}")
         return True
+
+    @staticmethod
+    def get_file_list_mult(fps,ignore_paths=[],files_filter=None,
+                    delete_marker=None, show_info= False):
+        """ creates a dictionary of files across file locations
+            can be used for identifying duplicates / automatic deletion 
+            
+        """
+        
+        files_dict = {}
+        for fp in fps:
+            for subpath,subdirs,files in os.walk(fp):
+                sp = os.path.normpath(os.path.join(fp,subpath))
+                # ignore paths
+                if Util.contains(subpath,ignore_paths):
+                    continue
+
+                # check if subpath contains a marker file for deletion
+                cleanup_folder = False
+                if isinstance(delete_marker,str):
+                    cleanup_folder = os.path.isfile(os.path.join(subpath,delete_marker))
+                if os.path.ismount(subpath):
+                    cleanup_folder = False
+
+                if cleanup_folder and show_info:
+                    print(f"-- FOLDER {subpath} marked for cleanup")
+
+                for f in files:            
+                    if isinstance(files_filter,list):
+                        if not(Util.contains(f,files_filter)):
+                            continue
+
+                    # get absolute path
+                    drive,subdrive_path =  os.path.splitdrive(subpath)
+
+                    file_abspath = os.path.join(drive, subdrive_path,f)                                                    
+
+                    file_props = files_dict.get(f,{})
+                    file_props_updated = {}
+
+                    # get file path
+                    file_paths = file_props.get("path",[])
+                    file_paths.append(subpath)
+                    file_paths = list(dict.fromkeys(file_paths))
+                    file_props_updated["path"] = file_paths
+
+                    # consider cleanup
+                    file_paths_cleanup = file_props.get("cleanup_path",[])
+                    if cleanup_folder:
+                        file_paths_cleanup.append(subpath)
+                    file_paths_cleanup = list(dict.fromkeys(file_paths_cleanup))
+                    file_props_updated["cleanup_path"] = file_paths_cleanup
+
+                    # get other attributes
+                    size = Path(file_abspath).stat().st_size
+                    byte_info = Util.byte_info(size,num_decimals=1,short=False)
+                    created_on = datetime.fromtimestamp(int(Path(file_abspath).stat().st_ctime))
+                    changed_on = datetime.fromtimestamp(int(Path(file_abspath).stat().st_mtime))
+                    file_props_updated["filesize"] = size
+                    file_props_updated["created_on"] = created_on
+                    file_props_updated["changed_on"] = changed_on
+                    # update
+                    files_dict.update({f:file_props_updated})
+                    if show_info:
+                        s_del = ""
+                        if cleanup_folder:
+                            s_del = " [DELETE]"
+                        print(f"[{drive[0]}] {f[:35]}... ({Util.byte_info(size)},created {created_on}) {s_del}")
+
+        return files_dict            
