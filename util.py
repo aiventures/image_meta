@@ -6,6 +6,9 @@ from dateutil.parser import parse
 from dateutil.tz import tzutc
 from dateutil.tz import tzoffset
 from math import ceil
+from math import log
+from math import floor
+from functools import reduce
 import pytz
 
 class Util:
@@ -432,5 +435,56 @@ class Util:
         iso["weekday"] = d.isoweekday()
         
         return iso
+
+    @staticmethod
+    def byte_info(x:int,short:bool=True,num_decimals:int=1):
+        """ returns formatted size in bytes 
+            Parameters
+            ----------
+            x : int
+                Byte size (integer)
+            short: boolean, optional (default True)
+                output as string or dictionary
+            num_decimals: int, optional (default 1)
+                number of decimals
+            Returns
+            -------
+            str,dict
+                depending on short flag, formatted string or dictionary with all conversion details
+        """
+        
+        ld_x = log(x,2**10) # exponent to base 1024
+        exp_int = floor(ld_x)
+        exp_frac = ld_x - exp_int
+        units = ("","Kilo","Mega","Giga","Tera","Peta","Exa","Zetta","Yotta")
+        value = (2**10)**exp_frac
+        text = str(round(value,num_decimals))+" "+units[exp_int]+"bytes"
+        if short:
+            r = text
+        else:
+            r = {}
+            r["value_int"] = x
+            r["power_int_1024"] = exp_int
+            r["power_frac_1024"] = exp_frac
+            r["value"] = round(value,num_decimals)
+            r["units"] = units[exp_int]
+            r["text"] = text
+        
+        return r
+
+    @staticmethod
+    def contains(s:str,substrings=None):
+        """ checks if substring contained in a list is contained in a given string (case insensitive) """
+        if substrings is None:
+            return None
+        if isinstance(substrings,str):
+            substrings = [substrings]
+        if not (isinstance(substrings,list)):
+            return False
+        l = list(map(lambda i:i.lower() in s.lower(),substrings))
+        if len(l) == 0:
+            return False
+
+        return reduce(lambda a,b:a or b,l)        
 
     
