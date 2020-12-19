@@ -760,7 +760,7 @@ class Persistence:
         files_copy = list(filter(lambda f:os.path.isfile(os.path.join(fp_src,f)), files_copy))
         if showinfo:
             print(f"Files from {fp_src} to Copy:\n {files_copy}")
-        root_subdirs = []   
+        # root_subdirs = []   
         
         for subpath,subdirs,files in os.walk(fp):
             # only process direct parents
@@ -768,7 +768,7 @@ class Persistence:
                 if showinfo:
                     print(f"\n*** subpath {subpath} ***\n")
 
-                root_subdirs = subdirs
+                # root_subdirs = subdirs
                 for subdir in subdirs:
                     absolute_path = os.path.join(subpath,subdir)
                     if showinfo:
@@ -835,8 +835,8 @@ class Persistence:
         
         files_dict = {}
         for fp in fps:
-            for subpath,subdirs,files in os.walk(fp):
-                sp = os.path.normpath(os.path.join(fp,subpath))
+            for subpath,_,files in os.walk(fp):
+                # sp = os.path.normpath(os.path.join(fp,subpath))
                 # ignore paths
                 if Util.contains(subpath,ignore_paths):
                     continue
@@ -879,7 +879,7 @@ class Persistence:
 
                     # get other attributes
                     size = Path(file_abspath).stat().st_size
-                    byte_info = Util.byte_info(size,num_decimals=1,short=False)
+                    # byte_info = Util.byte_info(size,num_decimals=1,short=False)
                     created_on = datetime.fromtimestamp(int(Path(file_abspath).stat().st_ctime))
                     changed_on = datetime.fromtimestamp(int(Path(file_abspath).stat().st_mtime))
                     file_props_updated["filesize"] = size
