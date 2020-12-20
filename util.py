@@ -6,6 +6,7 @@ from dateutil.parser import parse
 from dateutil.tz import tzutc
 from dateutil.tz import tzoffset
 from math import ceil
+from math import inf
 from math import log
 from math import floor
 from functools import reduce
@@ -453,6 +454,19 @@ class Util:
                 depending on short flag, formatted string or dictionary with all conversion details
         """
         
+        if x == 0:
+            r = {}
+            r["value_int"] = x
+            r["power_int_1024"] = (-1) * inf
+            r["power_frac_1024"] = 1
+            r["value"] = 0
+            r["units"] = ""
+            r["text"] = "0 bytes"
+            if short:
+                return r["text"]
+            else:
+                return r
+
         ld_x = log(x,2**10) # exponent to base 1024
         exp_int = floor(ld_x)
         exp_frac = ld_x - exp_int
