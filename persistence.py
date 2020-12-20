@@ -827,7 +827,7 @@ class Persistence:
 
     @staticmethod
     def get_file_list_mult(fps,ignore_paths=[],files_filter=None,
-                    delete_marker=None, show_info= False):
+                    delete_marker=None, show_info= False, export_as_path_dir=False):
         """ creates a dictionary of files across file locations
             can be used for identifying duplicates / automatic deletion 
             
@@ -869,7 +869,8 @@ class Persistence:
                     file_paths.append(subpath)
                     file_paths = list(dict.fromkeys(file_paths))
                     file_props_updated["path"] = file_paths
-
+                    file_props_updated["filename"] = f
+                    
                     # consider cleanup
                     file_paths_cleanup = file_props.get("cleanup_path",[])
                     if cleanup_folder:
@@ -892,5 +893,17 @@ class Persistence:
                         if cleanup_folder:
                             s_del = " [DELETE]"
                         print(f"[{drive[0]}] {f[:35]}... ({Util.byte_info(size)},created {created_on}) {s_del}")
+        
+        # export as dictionary with path as key
+        if export_as_path_dir:
+            path_dict = {}
+            for f,v in files_dict.items():
+                pl = v["path"]
+                for p in pl:
+                    file_dict = path_dict.get(p,{})
+                    # new dict entry corresponds to file
+                    file_dict[f] = v
+                    path_dict[p] = file_dict
+            files_dict = path_dict
 
         return files_dict            
