@@ -607,17 +607,23 @@ class Persistence:
     @staticmethod
     def copy_rename(fp,trg_path_root,regex_filter=None,regex_subst=None,s_subst="",debug=False,save=True):        
         """  Recursively (from subpaths) copies files matching to regex name patterns and/or renames files 
-             Parameters
-             fp            : source path
-             trg_path_root : target path root
-             regex_filter  : file filter regex (if set to None, all files will be copied)
-             regex_subst   : regex for substitution (if set to None, nothing will be renamed)
-             s_subst       : substitution string
-             debug         : show debug information
-             save          : execute the operations. If false, changes are not saved
-             Returns None
+            Parameters
+            -----------
+            fp            : str
+            source path
+            trg_path_root : target path root
+            regex_filter  : file filter regex (if set to None, all files will be copied)
+            regex_subst   : regex for substitution (if set to None, nothing will be renamed)
+            s_subst       : substitution string
+            debug         : show debug information
+            save          : execute the operations. If false, changes are not saved
+            
+            Returns 
+            --------------
+             None
 
-            Example regex
+            Example 
+            -----------------
             regex_filter = r"url|pdf$" # copies either url or pdf at the end
             regex_subst = "(group)" # all strings "group" will be assignerd match group \1
             s_subst = r"-- this is \1 --" "group" will be replaced by "-- this is group --"
@@ -830,6 +836,26 @@ class Persistence:
                     delete_marker=None, show_info= False, export_as_path_dir=False):
         """ creates a dictionary of files across file locations
             can be used for identifying duplicates / automatic deletion 
+
+            Parameters
+            ----------
+            fps : list
+                list of filepaths
+            ignore_paths : list
+                list of strings. when contianed in afile path, these paths will be ignored for processing
+            files_filter : list
+                only files having a substring contained in the filter list will be processed
+            delete_marker : str
+                filename. If a directory contains a file with this name, it will be considered to be deleted 
+            show_info : bool
+                show debugging info 
+            export_as_path_dir : bool
+                export dictionary will bhave filename as key (referencing found paths ). 
+                If set to true the dictionary key will be path instead
+            
+            Returns
+            -------
+            dict: dictionary with detailed information about file duplicate locations, file sizes, dates
             
         """
         
@@ -849,7 +875,7 @@ class Persistence:
                     cleanup_folder = False
 
                 if cleanup_folder and show_info:
-                    print(f"-- FOLDER {subpath} marked for cleanup")
+                    print(f"--- FOLDER {subpath} marked for cleanup")
 
                 for f in files:            
                     if isinstance(files_filter,list):
@@ -907,3 +933,199 @@ class Persistence:
             files_dict = path_dict
 
         return files_dict            
+
+    @staticmethod
+    def display_file_list_mult(fps,ignore_paths=[],files_filter=None,
+                    delete_marker=None, delete_all_duplicates=True,
+                    show_del_files_only=False,show_info=False):
+        """ display files read across file locations
+            can be used for identifying duplicates / automatic deletion 
+
+            Parameters
+            ----------
+            fps : list
+                list of filepaths
+            ignore_paths : list
+                list of strings. when contianed in afile path, these paths will be ignored for processing
+            files_filter : list
+                only files having a substring contained in the filter list will be processed
+            delete_marker : str
+                filename. If a directory contains a file with this name, it will be considered to be deleted 
+            delete_all_duplicates : bool
+                deletes all file duplicates tjhat are found in search path. Otherwise only file is deleted where
+                delete_marker file is located                
+            show_del_files_only : bool
+                only show files that will be deleted
+            show_info : bool
+                show debugging info 
+            export_as_path_dir : bool
+                export dictionary will bhave filename as key (referencing found paths ). 
+                If set to true the dictionary key will be path instead
+            
+            Returns
+            -------
+            dict: dictionary with detailed information about file duplicate locations, file sizes, dates
+            
+        """
+
+        path_dict = Persistence.get_file_list_mult(fps,ignore_paths=ignore_paths,files_filter=files_filter,
+                                                   delete_marker=delete_marker, show_info=False,
+                                                   export_as_path_dir=True)
+            
+        path_list = sorted(path_dict.keys(),key=str.lower)
+
+        drive_info_dict = {}
+        for p in path_list:
+            drive,_ = os.path.splitdrive(p)
+            drive_info = drive_info_dict.get(drive,{})
+            
+            print(f"---|    + <{p}>")
+            files = sorted(path_dict[p].keys(),key=str.lower)
+            file_num = len(files)
+            filesize_folder = 0
+            contains_delete_file = False
+            for f in files:
+                file_info = path_dict[p][f]    
+                paths = path_dict[p][f]["path"]
+                if len(file_info['cleanup_path']) > 0:
+                    if ((p in file_info['cleanup_path']) or 
+                        delete_all_duplicates):
+                        s_cln = "DEL"
+                        contains_delete_file = True
+                else:
+                    s_cln = "---"
+                if ((contains_delete_file and show_del_files_only) or
+                    (not show_del_files_only)):
+                    filesize_folder += file_info['filesize']
+                    print(f"|  +-{s_cln}| {(f[:45]+'..').ljust(47)}|{file_info['created_on']}|({len(paths)})")
+            if filesize_folder > 0:
+                print(f"|         FOLDER: {file_num} files, {Util.byte_info(filesize_folder)}")    
+                print("|")
+            drive_info["size"] = drive_info.get("size",0) + filesize_folder
+            drive_info["file_num"] = drive_info.get("file_num",0) + file_num    
+            drive_info_dict[drive] = drive_info
+
+        print("\n-- SUMMARY ---")
+        for d,v in drive_info_dict.items():
+            total,used,free = shutil.disk_usage(d)
+            free_percent = str(100*free//total)+"%"
+            total = Util.byte_info(total)
+            used = Util.byte_info(used)
+            free = Util.byte_info(free)
+            disk_info = f"Used ({used}/{total}), free {free}"
+            print(f"Drive {d} {v['file_num']} files, {Util.byte_info(v['size'])}, {disk_info} ({free_percent})")
+        
+        return path_dict
+
+    @staticmethod
+    def delete_files_mult(fps,ignore_paths=[],files_filter=None,delete_marker=None, 
+                        delete_all_duplicates = True, delete_folder=True,
+                        delete_ext = ["txt"],persist=False,show_info=True,verbose=False):
+        """ looks for a delete marker file, will delete all files of same name and eventually 
+            with different extensions and optionally all its duplicates
+
+            Parameters
+            ----------
+            fps : list
+                list of filepaths
+            ignore_paths : list
+                list of strings. when contianed in a file path, these paths will be ignored for processing
+            files_filter : list
+                only files having a substring contained in the filter list will be processed
+            delete_marker : str
+                filename. If a directory contains a file with this name, it will be considered to be deleted 
+            delete_all_duplicates : bool
+                deletes all file duplicates tjhat are found in search path. Otherwise only file is deleted where
+                delete_marker file is located
+            delete_folder : bool
+                after deletion of files folder is deleted as well (only if it is empty)
+            delete_ext : list
+                list of extensions of files that should vbe deleted
+            persist : bool
+                save deletions (oherwise only results of analysis are shown)
+            show_info : bool
+                show debugging info
+            verbose : bool
+                show detailed information
+            
+            Returns
+            -------
+            tuple: (folder_list, file_list) files and folders that were deleted                         
+        """
+
+        fl = Persistence.get_file_list_mult(fps,ignore_paths=ignore_paths,files_filter=files_filter,
+                            delete_marker=delete_marker, show_info=False)
+
+        if show_info:
+            if isinstance(fl,dict):
+                num_files = len(list(fl.keys()))
+            print("----------")
+            print(f"Delete extensions {delete_ext}, Duplicates:{delete_all_duplicates}, Folders:{delete_folder}, File count:{num_files}")
+            print("----------")
+
+        delete_files = []       
+        delete_folders = [] 
+            
+        for f,v in fl.items():
+
+            cleanup_paths = v["cleanup_path"]
+            p_list = v["path"] 
+            if len(cleanup_paths) == 0:
+                continue
+                
+            f_info = Persistence.get_filepath_info(f)
+            f_stem = f_info["stem"]
+            f_del_list = []
+            for ext in delete_ext:
+                f_del_list.append(f"{f_stem}.{ext}")
+            
+            # add delete marker
+            f_del_list.append(delete_marker)
+            if show_info and verbose:    
+                print("----")
+                print(f"DELETE: file {f} \n        Paths {p_list}")
+                print(f"        Del paths {cleanup_paths})")        
+                
+            # process all file duplicates
+            for p in p_list: 
+                if ((not (p in cleanup_paths)) and (not delete_all_duplicates)):
+                    continue
+                if show_info and verbose:
+                    print(f"        * DELETE DIRECTORY: {p}")
+                for f_del in f_del_list:
+                    f_del_abspath = os.path.join(p,f_del)
+                    if (not os.path.isfile(f_del_abspath)):
+                        continue
+                    delete_folders.append(p)
+                    if show_info and verbose:
+                        print(f"          - {f_del[:40]}...{f_del[-6:]}")
+                    delete_files.append(f_del_abspath)
+
+        delete_files = sorted(list(dict.fromkeys(delete_files)),key=str.lower)
+        delete_folders = sorted(list(dict.fromkeys(delete_folders)),key=str.lower)
+
+        if show_info:
+            print(f"\n--- FILES FOR DELETION (SAVED: {persist}) ---")
+        for del_file in delete_files:
+            try:
+                if show_info:
+                    print(f"- DELETE {del_file[:40]}...{del_file[-15:]}")            
+                if persist:
+                    os.remove(del_file)         
+            except IOError as ex:
+                print (f"Error: {ex.filename} - {ex.strerror}")
+                print(traceback.format_exc())           
+
+        if show_info:
+            print(f"\n--- FOLDERS FOR DELETION (SAVED: {persist}) ---")
+        for del_folder in delete_folders:
+            try:
+                if show_info:
+                    print(f"- DELETE {del_folder}")            
+                if persist:
+                    os.rmdir(del_folder)          
+            except IOError as ex:
+                print (f"Error: {ex.filename} - {ex.strerror}")
+                print(traceback.format_exc())           
+        
+        return (delete_folders,delete_files)
