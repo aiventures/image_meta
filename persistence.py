@@ -952,7 +952,7 @@ class Persistence:
             delete_marker : str
                 filename. If a directory contains a file with this name, it will be considered to be deleted 
             delete_all_duplicates : bool
-                deletes all file duplicates tjhat are found in search path. Otherwise only file is deleted where
+                deletes all file duplicates that are found in search path. Otherwise only file is deleted where
                 delete_marker file is located                
             show_del_files_only : bool
                 only show files that will be deleted
@@ -979,7 +979,8 @@ class Persistence:
             drive,_ = os.path.splitdrive(p)
             drive_info = drive_info_dict.get(drive,{})
             
-            print(f"---|    + <{p}>")
+            #print(f"---|    + <{p}>")
+            print(f"{p}")
             files = sorted(path_dict[p].keys(),key=str.lower)
             file_num = len(files)
             filesize_folder = 0
@@ -997,15 +998,15 @@ class Persistence:
                 if ((contains_delete_file and show_del_files_only) or
                     (not show_del_files_only)):
                     filesize_folder += file_info['filesize']
-                    print(f"|  +-{s_cln}| {(f[:45]+'..').ljust(47)}|{file_info['created_on']}|({len(paths)})")
+                    print(f"|  +-{s_cln}| {(f[:55]+'..').ljust(57)}|{file_info['created_on']}|({len(paths)})")
             if filesize_folder > 0:
                 print(f"|         FOLDER: {file_num} files, {Util.byte_info(filesize_folder)}")    
                 print("|")
             drive_info["size"] = drive_info.get("size",0) + filesize_folder
             drive_info["file_num"] = drive_info.get("file_num",0) + file_num    
             drive_info_dict[drive] = drive_info
-
-        print("\n-- SUMMARY ---")
+        now = datetime.now()
+        print(f"\n-- SUMMARY (Date: {now.replace(microsecond=0)})---")
         for d,v in drive_info_dict.items():
             total,used,free = shutil.disk_usage(d)
             free_percent = str(100*free//total)+"%"
@@ -1102,14 +1103,28 @@ class Persistence:
                     delete_files.append(f_del_abspath)
 
         delete_files = sorted(list(dict.fromkeys(delete_files)),key=str.lower)
+        
+        del_fp_dict = {}
+        for del_fp in delete_files:
+            drive,del_p = os.path.splitdrive(del_fp)
+            del_fp_list = del_fp_dict.get(del_p,[])
+            del_fp_list.append(del_fp)
+            del_fp_dict[del_p] = del_fp_list
+        
+        delete_files = []
+        file_refs = sorted(del_fp_dict.keys())
+        for file_ref in file_refs:
+            delete_files.extend(del_fp_dict[file_ref])
+        
         delete_folders = sorted(list(dict.fromkeys(delete_folders)),key=str.lower)
 
         if show_info:
             print(f"\n--- FILES FOR DELETION (SAVED: {persist}) ---")
+        
         for del_file in delete_files:
             try:
                 if show_info:
-                    print(f"- DELETE {del_file[:40]}...{del_file[-15:]}")            
+                    print(f"- DELETE {del_file[:50]}...{del_file[-15:]}")            
                 if persist:
                     os.remove(del_file)         
             except IOError as ex:
