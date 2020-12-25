@@ -500,5 +500,23 @@ class Util:
             return False
 
         return reduce(lambda a,b:a or b,l)        
+    
+    @staticmethod
+    def trunc_string(s,start=19,end=19,s_length=40):
+        """ will format string and cut off in the middle parts if it exceeds length. 
+            will return a string of length s_length"""
+        s_new = s
+        fill_s = ".."
+        len_fill = len(fill_s)
+        len_s = len(s)    
+        # cut string
+        if (len_s+len_fill) > s_length:
+            s_start = s[:start]        
+            i_start_end = max([(len_s - end),start])
+            s_end = s[i_start_end:]
+            s_new = s_start + fill_s + s_end
+            s_new = s_new[:s_length]
+            
+        return s_new.ljust(s_length)    
 
     
