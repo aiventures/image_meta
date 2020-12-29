@@ -56,6 +56,7 @@ class Persistence:
     FILEINFO_ACTIONS = "actions"  
     FILEINFO_CREATED_ON = "created_on"
     FILEINFO_CHANGED_ON = "changed_on"
+    FILEINFO_SIZE = "size"    
 
     # regex pattern for a raw file name: 3 letters 5 decimals
     REGEX_RAW_FILE_NAME = r"[a-zA-Z]{3}\d{5}"
@@ -484,6 +485,7 @@ class Persistence:
             date_created = datetime.fromtimestamp(int(os.path.getctime(fileinfo[Persistence.FILEINFO_FILEPATH])))
             fileinfo[Persistence.FILEINFO_CHANGED_ON] = date_changed
             fileinfo[Persistence.FILEINFO_CREATED_ON] = date_created
+            fileinfo[Persistence.FILEINFO_SIZE] =  Path(filepath).stat().st_size
 
         # create potentially new folder name / file name
         if ( fileinfo[Persistence.FILEINFO_EXISTING_PARENT] is not None and fileinfo[Persistence.FILEINFO_OBJECT] is None):
@@ -998,7 +1000,8 @@ class Persistence:
                 if ((contains_delete_file and show_del_files_only) or
                     (not show_del_files_only)):
                     filesize_folder += file_info['filesize']
-                    print(f"|  +-{s_cln}| {(f[:55]+'..').ljust(57)}|{file_info['created_on']}|({len(paths)})")
+                    f_trunc = Util.trunc_string(f,start=33,end=32,s_length=67)
+                    print(f"|  +-{s_cln}| {f_trunc}|{file_info['created_on']}|({len(paths)})")
             if filesize_folder > 0:
                 print(f"|         FOLDER: {file_num} files, {Util.byte_info(filesize_folder)}")    
                 print("|")
