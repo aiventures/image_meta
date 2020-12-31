@@ -1098,7 +1098,7 @@ class Persistence:
                                                    delete_marker=delete_marker, show_info=show_info,
                                                    export_as_path_dir=True)
         
-        paths = sorted(path_dict.keys())
+        paths = sorted(path_dict.keys(),key=str.casefold)
 
         if isinstance(start_number,int):
             number_idx = start_number
@@ -1110,7 +1110,7 @@ class Persistence:
         for p in paths:
             print(f"\n[FOLDER] {p}\n----------------------------")
             path_info = path_dict[p]
-            files = sorted(path_info.keys())
+            files = sorted(path_info.keys(),key=str.casefold)
             for f in files:
                 file_info = path_info[f]
                 s_fileinfo = __fileinfo_as_string__(file_info,show_url=show_url,
