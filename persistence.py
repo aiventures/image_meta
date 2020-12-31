@@ -56,6 +56,7 @@ class Persistence:
     FILEINFO_ACTIONS = "actions"  
     FILEINFO_CREATED_ON = "created_on"
     FILEINFO_CHANGED_ON = "changed_on"
+    FILEINFO_URL = "url"
     FILEINFO_SIZE = "size"    
 
     # regex pattern for a raw file name: 3 letters 5 decimals
@@ -481,11 +482,16 @@ class Persistence:
         if fileinfo[Persistence.FILEINFO_IS_FILE]:
             fileinfo[Persistence.FILEINFO_OBJECT]  = Persistence.OBJECT_FILE
             fileinfo[Persistence.FILEINFO_ACTIONS] = Persistence.ACTIONS_FILE
+            # adding special properties
+            # dates and sizes
             date_changed = datetime.fromtimestamp(int(os.path.getmtime(fileinfo[Persistence.FILEINFO_FILEPATH])))
             date_created = datetime.fromtimestamp(int(os.path.getctime(fileinfo[Persistence.FILEINFO_FILEPATH])))
             fileinfo[Persistence.FILEINFO_CHANGED_ON] = date_changed
             fileinfo[Persistence.FILEINFO_CREATED_ON] = date_created
             fileinfo[Persistence.FILEINFO_SIZE] =  Path(filepath).stat().st_size
+            # for urls add url field
+            if  fileinfo[Persistence.FILEINFO_SUFFIX] == "url":
+                fileinfo[Persistence.FILEINFO_URL] = Persistence.read_internet_shortcut(np)
 
         # create potentially new folder name / file name
         if ( fileinfo[Persistence.FILEINFO_EXISTING_PARENT] is not None and fileinfo[Persistence.FILEINFO_OBJECT] is None):
@@ -834,7 +840,7 @@ class Persistence:
         return True
 
     @staticmethod
-    def get_file_list_mult(fps,ignore_paths=[],files_filter=None,
+    def get_file_list_mult(fps:list,ignore_paths=[],files_filter=None,
                     delete_marker=None, show_info= False, export_as_path_dir=False):
         """ creates a dictionary of files across file locations
             can be used for identifying duplicates / automatic deletion 
@@ -852,7 +858,7 @@ class Persistence:
             show_info : bool
                 show debugging info 
             export_as_path_dir : bool
-                export dictionary will bhave filename as key (referencing found paths ). 
+                export dictionary will have filename as key (referencing found paths ). 
                 If set to true the dictionary key will be path instead
             
             Returns
@@ -860,7 +866,14 @@ class Persistence:
             dict: dictionary with detailed information about file duplicate locations, file sizes, dates
             
         """
-        
+
+        if not isinstance(fps,list):
+            if isinstance(fps,str) and not os.path.isdir(fps):
+                print(f"filelist {fps} is not a list of filepaths")
+                return None
+            else:
+                fps = [fps]
+
         files_dict = {}
         for fp in fps:
             for subpath,_,files in os.walk(fp):
@@ -914,12 +927,17 @@ class Persistence:
                     file_props_updated["filesize"] = size
                     file_props_updated["created_on"] = created_on
                     file_props_updated["changed_on"] = changed_on
+                    # for urls get link address
+                    if f[-3:] == "url":
+                        file_props_updated["url"] = Persistence.read_internet_shortcut(file_abspath)
+
                     # update
                     files_dict.update({f:file_props_updated})
                     if show_info:
                         s_del = ""
                         if cleanup_folder:
                             s_del = " [DELETE]"
+                        print("abspath",file_abspath,"subpath",subpath,"drive",drive,"file",f,size,Util.byte_info(size))
                         print(f"[{drive[0]}] {f[:35]}... ({Util.byte_info(size)},created {created_on}) {s_del}")
         
         # export as dictionary with path as key
@@ -961,7 +979,7 @@ class Persistence:
             show_info : bool
                 show debugging info 
             export_as_path_dir : bool
-                export dictionary will bhave filename as key (referencing found paths ). 
+                export dictionary will have filename as key (referencing found paths ). 
                 If set to true the dictionary key will be path instead
             
             Returns
@@ -1019,6 +1037,93 @@ class Persistence:
             disk_info = f"Used ({used}/{total}), free {free}"
             print(f"Drive {d} {v['file_num']} files, {Util.byte_info(v['size'])}, {disk_info} ({free_percent})")
         
+        return path_dict
+
+    @staticmethod
+    def display_file_list_by_folder(fps,ignore_paths=[],files_filter=None,
+                    delete_marker=None, show_del_files_only=False,show_info=False,
+                    show_url=True, start_number=1,show_filename_simple=True):
+        """ display files read across file locations and show results by folder
+
+            Parameters
+            ----------
+            fps : list
+                list of filepaths
+            ignore_paths : list
+                list of strings. when contianed in afile path, these paths will be ignored for processing
+            files_filter : list
+                only files having a substring contained in the filter list will be processed
+            delete_marker : str
+                filename. If a directory contains a file with this name, it will be considered to be deleted         
+            show_del_files_only : bool
+                only show files that will be deleted
+            show_info : bool
+                show debugging info 
+            show_url:
+                display url of hyperlink files
+            start_number:
+                numbers files: (None: numbering disabled otherwise the number passed is the start number)
+            show_filename_simple:
+                shows only the filename in the list
+            Returns
+            -------
+            dict: dictionary with detailed information about file duplicate locations, file sizes, dates
+            
+        """
+
+        # will only be used within this method
+        def __fileinfo_as_string__(file_info: dict,show_url=True,number=None,show_filename_simple=False):
+            """ transforms file info information for a single file into a display string """
+            s_file = Util.trunc_string(file_info['filename'], start=28, end=27, s_length=57)
+            changed = file_info['changed_on']
+            s_url = ""
+            if number is None:
+                s_list_char = "-"
+            else:
+                s_list_char = "("+str(number).zfill(3)+")"
+            
+            if show_url:
+                url = file_info.get("url",None)
+                if url is not None:
+                    s_url = "\n"+url          
+            size = (Util.byte_info(file_info['filesize'], num_decimals=0)).ljust(15)
+            if show_filename_simple:
+                s = f"{s_list_char} {file_info['filename']}"
+            else:
+                s = f"{s_list_char} {s_file}|CHG:{changed}|{size}|"
+            s += s_url
+            return s 
+
+        path_dict = Persistence.get_file_list_mult(fps, ignore_paths=ignore_paths, files_filter=files_filter,
+                                                   delete_marker=delete_marker, show_info=show_info,
+                                                   export_as_path_dir=True)
+        
+        paths = sorted(path_dict.keys())
+
+        if isinstance(start_number,int):
+            number_idx = start_number
+        else:
+            number_idx = None
+
+        num_files = 0
+
+        for p in paths:
+            print(f"\n[FOLDER] {p}\n----------------------------")
+            path_info = path_dict[p]
+            files = sorted(path_info.keys())
+            for f in files:
+                file_info = path_info[f]
+                s_fileinfo = __fileinfo_as_string__(file_info,show_url=show_url,
+                                                    number=number_idx,
+                                                    show_filename_simple=show_filename_simple)
+                if number_idx is not None:
+                    number_idx += 1
+                print(s_fileinfo)
+
+        print("\n---------------------")     
+        now = datetime.now()
+        print(f"Date: {now.replace(microsecond=0)}, Number of Files:{(number_idx-start_number)}")
+                                                   
         return path_dict
 
     @staticmethod
