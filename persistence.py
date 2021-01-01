@@ -1109,7 +1109,7 @@ class Persistence:
             number_idx = None
 
         for p in paths:
-            print(f"\n[FOLDER] {p}\n----------------------------")
+            print(f"\n----------------------------\n[FOLDER] {p}")
             path_info = path_dict[p]
             # sort files
             file_info_list = list(path_info.values())
@@ -1121,16 +1121,17 @@ class Persistence:
                 file_info_list = sorted(file_info_list,
                                         key=lambda f:(f["filename"]).lower(),
                                         reverse=reverse)
-
+            num_files = 0
             for file_info in file_info_list:
+                num_files += 1
                 s_fileinfo = __fileinfo_as_string__(file_info,show_url=show_url,
                                                     number=number_idx,
                                                     show_filename_simple=show_filename_simple)
                 if number_idx is not None:
                     number_idx += 1
                 print(s_fileinfo)
-
-        print("\n---------------------")     
+            print(f"\nFolder {p}, {num_files} files")
+            print("----------------------------------------------")
         now = datetime.now()
         print(f"Date: {now.replace(microsecond=0)}, Number of Files:{(number_idx-start_number)}")
                                                    
