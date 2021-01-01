@@ -1042,7 +1042,8 @@ class Persistence:
     @staticmethod
     def display_file_list_by_folder(fps,ignore_paths=[],files_filter=None,
                     delete_marker=None, show_del_files_only=False,show_info=False,
-                    show_url=True, start_number=1,show_filename_simple=True):
+                    show_url=True, start_number=1,show_filename_simple=True,
+                    sort_by_date=True,reverse=True):
         """ display files read across file locations and show results by folder
 
             Parameters
@@ -1061,10 +1062,12 @@ class Persistence:
                 show debugging info 
             show_url:
                 display url of hyperlink files
-            start_number:
+            start_number: (int,None)
                 numbers files: (None: numbering disabled otherwise the number passed is the start number)
-            show_filename_simple:
+            show_filename_simple: bool
                 shows only the filename in the list
+            sort_by_date: bool
+                sort the result by file change date
             Returns
             -------
             dict: dictionary with detailed information about file duplicate locations, file sizes, dates
@@ -1105,14 +1108,21 @@ class Persistence:
         else:
             number_idx = None
 
-        num_files = 0
-
         for p in paths:
             print(f"\n[FOLDER] {p}\n----------------------------")
             path_info = path_dict[p]
-            files = sorted(path_info.keys(),key=str.casefold)
-            for f in files:
-                file_info = path_info[f]
+            # sort files
+            file_info_list = list(path_info.values())
+            if sort_by_date:
+                file_info_list = sorted(file_info_list,
+                                        key=lambda f:f["changed_on"],
+                                        reverse=reverse)                
+            else: 
+                file_info_list = sorted(file_info_list,
+                                        key=lambda f:(f["filename"]).lower(),
+                                        reverse=reverse)
+
+            for file_info in file_info_list:
                 s_fileinfo = __fileinfo_as_string__(file_info,show_url=show_url,
                                                     number=number_idx,
                                                     show_filename_simple=show_filename_simple)
@@ -1214,7 +1224,7 @@ class Persistence:
         
         del_fp_dict = {}
         for del_fp in delete_files:
-            drive,del_p = os.path.splitdrive(del_fp)
+            _,del_p = os.path.splitdrive(del_fp)
             del_fp_list = del_fp_dict.get(del_p,[])
             del_fp_list.append(del_fp)
             del_fp_dict[del_p] = del_fp_list
