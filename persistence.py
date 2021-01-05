@@ -512,105 +512,119 @@ class Persistence:
         return fileinfo
 
     @staticmethod
-    def delete_related_files(fp,input_file_ext_list=["jpg"],delete_file_ext_list=["arw"],delete=False,verbose=False,show_info=True,case_sensitive=False):
-        """ deletes additional files having the same filestem in fileref_list and given file extensions
-            or original file extension with appended suffix
-            Parameters
-            fp: filepath
-            case_sensitive: Case Sensitive 
-            verbose: show detailed processing information
-            show_info: show result list of deleted files
-            input_file_ext_list: reference file list (= stem information)
-            delete_file_ext_list: file extension list that are to be deleted
-            delete: flag to really delete files (otherwise only list is shown)
+    def delete_related_files(fp,src_ext="jpg", del_ext_list=["jpg","xml"],  
+                            regex_file_pattern = "^#file#",
+                            file_placeholder = "#file#", root_folder_only=True,
+                            show_info=True,case_sensitive=False,delete=False):
+        """ deletes additional files having the same filestem pattern as files of 
+            type src_ext having any extension given in del_ext_list adhering to 
+            a given naming pattern regex_file_pattern where filename stems will be 
+            represented by file_placeholder. Sounds more complicated than it is,
+            try this method. also see example
             
-            returns None
-        """   
+            Parameters
+            -------------------
+            fp : str
+                filepath root
+            src_ext : str
+                file extension. files with this extension will be used as reference files
+            del_ext_list : list (of strings)
+                deletion file extension: files having this extension 
+                matching in some way to source file will be added for deletion
+            regex_file_pattern : str
+                regex matching pattern
+            file_placeholder : str
+                string that should be used as placeholder for filename
+            root_folder_only :bool
+                delete files only in given file path, not in chidlren folders
+            case_sensitive: bool
+                Case Sensitive 
+            show_info: bool
+                show result list of deleted files
+            delete: bool
+                flag to really delete files (otherwise only list is shown)
 
-        # initialize file lists
-        if not isinstance(input_file_ext_list,list):
-            input_file_ext_list = []
-        
-        if not isinstance(delete_file_ext_list,list):
-            delete_file_ext_list = []
+            Returns
+            ------------
+            list
+                list of files to be / that were deleted 
+                
+            Examples
+            --------
+            folder contains: ['file_a.jpg','file_axx.xml','file_a.tif',,'aa_file_a.xml','b.jpg']
+            src_ext='jpg', del_ext_list=['jpg','xml']
+            The regex patterns correspond to default values
+            regex_file_pattern = ''^#file#'', file_placeholder = '#file#',
+            The method will select all jpg file as reference, matching pattern for files to be
+            deleted is all files to be deleted (jpg,xml) starting with the same filename stem
+            all jpgs (^#file#) will translate to matching pattern:
+            ^file_a, matching files for deletion (jpg,xml): file_a.jpg, file_axx.xml
+            but not aa_file_a.xml (doesn't start with 'file') or file_a.tif (extension tif)
+            ^b.jpg: No matches
+                
+        """  
 
-        # only delete if all files with deletion extension are found
-        delete_only_complete = False
-
-        if not case_sensitive:
-            input_file_ext_list = list(map(lambda e:e.lower(),input_file_ext_list))
-            delete_file_ext_list = list(map(lambda e:e.lower(),delete_file_ext_list))
-
-        deletion_list = []
+        len_ext = -len(src_ext)
 
         if show_info:
-            print(f"Input file extension: {input_file_ext_list} File Deletion extensions {delete_file_ext_list} ")
+            print(f"delete_similar_files,\n src ext:{src_ext}, trg ext:{del_ext_list},"+
+                f" case sensitive:{case_sensitive}, DELETE:{delete}")
 
+        del_files = []    
         for subpath,_,files in os.walk(fp):
-            
-            if verbose:
-                print(f"\n --- Directory {subpath} --- \n{', '.join(files)}")
 
-            file_dict = {}
-
-            for file in files:
-                if case_sensitive:
-                    file_dict[file] = file
-                else:
-                    file_dict[file] = file.lower()
-
-            for f_ref,f in file_dict.items():                
-
-                filepath = os.path.join(subpath,f_ref)
-                fileinfo = Persistence.get_filepath_info(filepath)
-                suffix = fileinfo["suffix"]
-                stem = fileinfo["stem"]
-
-                if not case_sensitive:
-                    suffix = suffix.lower()
-                    stem = stem.lower()
-                    
-                if not suffix in input_file_ext_list:
+            if root_folder_only:
+                if not subpath == fp:
+                    if show_info:
+                        print("Process root only, skip:",subpath)
                     continue
-                
-                # regex file stem ending with a deletion file extension
-                if len(delete_file_ext_list) > 0:
-                    regex = stem+".("+"|".join(delete_file_ext_list)+")$"
-                
-                    if verbose:
-                        print("regex",regex)
-                
-                    files_found_deletion = [f2 for f2 in file_dict.values() if ( ( len(re.findall(regex, f2)) > 0))]
-                    files_found_deletion = [(subpath,f2) for f2 in files_found_deletion]
 
-                    if delete_only_complete and ( not ( len(files_found_deletion) == len(delete_file_ext_list) ) ):
-                        continue
+            if show_info:
+                print("----------------------")
+                print(f"Path {subpath}")
+
+            # get all source files / get all files with deletion extensions
+            if case_sensitive:
+                re_src =  re.compile((src_ext+"$"))
+                del_list = list(filter(lambda f:(f.split(".")[-1] in del_ext_list), files))
+            else:
+                re_src =  re.compile((src_ext+"$"),re.IGNORECASE)
+                del_ext_list = list(map(lambda d_ext:d_ext.lower(),del_ext_list))
+                del_list = list(filter(lambda f:(f.split(".")[-1].lower() in del_ext_list)
+                                , files))
+
+            src_files = list(filter(lambda f: (re_src.search(f) is not None), files))
+            src_files = sorted(src_files,key=str.casefold)
+        
+            # create search regex for each file 
+            for src_file in src_files:
+                src_file_stem = src_file[:(len_ext-1)]
+                regex_file = regex_file_pattern.replace(file_placeholder,src_file_stem)
+                if case_sensitive:
+                    regex = re.compile(regex_file)
+                else:
+                    regex = re.compile(regex_file,re.IGNORECASE)
                 
-                    deletion_list.extend(files_found_deletion)
-
-        p_old = None        
-
-        for f_t in deletion_list:
-            p = f_t[0]
-            f = f_t[1]
-            f_ref = os.path.join(p,f)
-            
-            if not p_old == p:
-                p_old = p
+                del_list_files = list(filter(lambda d_ext: (regex.search(d_ext) is not None), del_list))     
                 if show_info:
-                    print(f"\n--- DELETE FILES: Path {p} ---")
+                    print(f"Match Pattern: {regex_file}\n  found {del_list_files}")
+                del_list_files = list(map(lambda f:os.path.join(subpath,f), del_list_files))  
+                del_files.extend(del_list_files)        
+
+        if show_info:
+            print("-------------\nFILE DELETION LIST:")
             
-            if os.path.isfile(f_ref):
+        for del_file in del_files:    
+            if show_info:
+                print(f"- {del_file}, valid {os.path.isfile(del_file)}",len(del_file))
+            if os.path.isfile(del_file):
                 if delete:
                     try:
-                        os.remove(f_ref)
+                        os.remove(del_file)
                     except:
-                        print(traceback.format_exc())
-                        
-                if show_info:
-                    print(f"    * DELETE {f}")
+                        print(traceback.format_exc())    
 
-        return None 
+        return del_files
 
     @staticmethod
     def copy_rename(fp,trg_path_root,regex_filter=None,regex_subst=None,s_subst="",debug=False,save=True):        

@@ -1007,8 +1007,8 @@ class Controller(object):
         return None
 
     @staticmethod
-    def process_images(template_fileref,showinfo=False,verbose=False,copy_dir=None,copy_ext_list=None,del_ext_list=None,
-                       persist=True,work_dir=None):
+    def process_images(template_fileref,showinfo=False,verbose=False,copy_dir=None,copy_ext_list=None,
+                       del_ext_list=None, del_src_ext="ARW",persist=True,work_dir=None):
         """ executes the whole workflow: read write parameters, write metadata and gps files, execute write to image files, cleanup  
             Arguments
             template_fileref: filepath to arguments file (as created by method create_param_template)
@@ -1017,8 +1017,13 @@ class Controller(object):
             copy_dir: filepath where all metadata will be copied before cleanup
             copy_ext_list: list of file extensions for files that should be copied
             del_ext_list: list of file extensions for files that should be deleted
+            del_src_ext: files with this extension will be used for identifiying files to be deleted 
             persist:really delete & copy files otherwise only show processing results
             work_dir: directly pass over work dir (can be used for external programs)
+            
+            See Also
+            --------
+            Persistence.delete_related_files : Method to identify and delete related files
         """
         
         finished = False
@@ -1056,16 +1061,15 @@ class Controller(object):
 
                 Persistence.copy_rename(fp=img_path,trg_path_root=copy_dir,regex_filter=regex_filter,debug=showinfo,save=persist)                  
 
-            if isinstance(del_ext_list,list):        
-
-                # get input file extension
-                input_ext = augmented_params.get("IMG_EXTENSIONS",["jpg"])  
+            if isinstance(del_ext_list,list) and isinstance(del_src_ext,str):        
 
                 if showinfo:
-                    print(f"\n##### finally: clean up metadata files with extension {del_ext_list}, persisted: {persist} #####\n")                            
-                
-                Persistence.delete_related_files(fp=img_path,input_file_ext_list=input_ext,delete_file_ext_list=del_ext_list,
-                                                 delete=persist,verbose=False,show_info=showinfo)
+                    print(f"\n##### finally: clean up metadata files with extension {del_ext_list}, do deletion: {persist} #####\n")  
+
+                # todo: input_ext > src_ext
+                Persistence.delete_related_files(fp=img_path, src_ext=del_src_ext, del_ext_list=del_ext_list,
+                                                 regex_file_pattern = "^#file#", file_placeholder = "#file#",
+                                                 show_info=showinfo,case_sensitive=False,delete=persist)
 
             finished = True
 
