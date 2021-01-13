@@ -861,6 +861,8 @@ class ExifTool(object):
         if city is not None:
             title = city
         if subloc is not None:
+            if title is None:
+                title = ""
             title = title + " (" + subloc + ")"
         if title is not None:
             for d in ExifTool.META_DESC:
