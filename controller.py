@@ -336,6 +336,22 @@ class Controller(object):
         return geo_dict
 
     @staticmethod
+    def get_latlon_from_url(f:str):
+        """ checks for any url links in folder and returns first occurrence
+            matching an osm link pattten as lat lon coordinates """
+        latlon_new = None
+        link_list = Persistence.filter_files(f,["url"])
+        for l in link_list:
+            abs_path = str(Path(os.path.normpath(os.path.join(f,l))))
+            url = Persistence.read_internet_shortcut(abs_path)
+            latlon_url = Geo.latlon_from_osm_url(url)
+            # get the 1st lat lon
+            if latlon_url:
+                latlon_new = latlon_url
+                break
+        return latlon_new
+
+    @staticmethod
     def prepare_execution(template_dict:dict,showinfo=False):
         """ validates template and checks, which actions can be done (reading hierarchy,geodata, exiftool,...) """
         
@@ -447,6 +463,14 @@ class Controller(object):
                 
         # read / create default latlon file and get default reverse data
         default_lat_lon = template_dict.get(Controller.TEMPLATE_DEFAULT_LATLON,None)
+        
+        # check if there is a osm link in the working directory and get coordinates
+        url_lat_lon = Controller.get_latlon_from_url(work_dir)
+        if url_lat_lon:
+            if showinfo:
+                print(f"    OSM Link found in work dir, default coordinates are set to {url_lat_lon}")
+                print(f"    NOTE: WILL ONLY BE USED IN CASE NO DEFAULT Geo FIle exists already!")
+            default_lat_lon = url_lat_lon
 
         if default_lat_lon is not None:
             
