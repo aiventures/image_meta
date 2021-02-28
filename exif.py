@@ -208,8 +208,14 @@ class ExifTool(object):
         self.process.stdin.flush()
         output = ""
         fd = self.process.stdout.fileno()
-        while not output.endswith(self.SENTINEL):   
-            output += os.read(fd, 4096).decode('utf-8')
+        encoding = 'windows-1252'
+        while not output.endswith(self.SENTINEL):  
+            try:
+                output += os.read(fd, 4096).decode(encoding)
+            except:
+                encoding = "utf-8"
+                output += os.read(fd, 4096).decode(encoding)
+
         return output[:-len(ExifTool.SENTINEL)]
 
     def get_metadict_from_img(self,filenames,metafilter=None,filetypes=IMG_FILE_TYPES,list_metadata=META_DATA_LIST,charset="UTF8") -> dict:
