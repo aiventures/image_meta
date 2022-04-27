@@ -1279,33 +1279,203 @@ class Persistence:
         return (delete_folders,delete_files)
 
     @staticmethod
-    def get_file_groups(fp:str="",r:str="^(.{1,19})",showinfo=False):
+    def get_file_groups(fp:str="",regex_list:list=["^(.{1,19})"],
+                        file_match_type:str="ANY", single_match:bool=True,
+                        show_info:bool=False):
         """ reads all files in a given filepath fp and will return
             groups of files in a dict that belong together, according 
-            to regex given as r. The Group name is the found regex expression
-            example 
+            to a list of regex expressions given as r. The Group name is the found regex expression
+            file_match_type (ALL or ANY) will determine whether all expressions need to match or 
+            if any of the regex matches is sufficient
+            if single_match is True, the file matching a pattern will only be listed once, 
+            for the first regex pattern found
+            Example 
             fp = "C.\\ ..."
-            r = "^(.{1,19})"
+            regex = ["^(.{1,19})"]
             will return groups for files thsat start with the same 19 characters of filename        
-            @TODO: EXTEND LOGIC TO A LIST OF REGEX EXPRESSIONS
         """
-        
+
+        # get all files first
         filelist = Persistence.get_file_list_mult([fp])
-        filegroups = {}
+        filegroup_dict = {}
+        
+        if file_match_type != "ALL":
+            file_match_type = "ANY"
 
-        # regex first 19 Characters 
-        regex = r
-        regexpr = re.compile(regex)
+        if show_info:
+            print("\n --- get_file_groups (Persistence) ---")
+            print(f"    FILE MATCH TYPE: [{file_match_type}] FILE REGEX RULES: {regex_list} \n") 
+        
         for f in filelist.keys():
-            r = regexpr.match(f)
-            if r is not None:
-                fg_name = r.group(0)
-                # add filegroup to list
-                fg_list = filegroups.get(fg_name,[])
-                paths = filelist[f]["path"]
-                for p in paths:
-                    fp = os.path.join(p,f)
-                    fg_list.append(fp)
-                filegroups[fg_name]=fg_list    
+            if show_info:
+                print(f"FILE: {f}")
+            
+            # check for all regexex
+            file_regex_match_list = []
+            regex_match_result_list = []
+            m_result = ""
+            for r in regex_list:            
+                m = re.match(r,f)
+                m_result = ""
+                if m:
+                    file_regex_match_list.append(True)
+                    # add result as key
+                    regex_match_result_list.append(m.groups()[0])
+                    m_result += (m.groups()[0]+", ")
+                else:
+                    file_regex_match_list.append(False)
+                    m_result += "None, "
+            
+            # check for results     
+            file_match_result = False    
+            if file_match_type == "ALL":
+                file_match_result = all(file_regex_match_list)
+            else:
+                file_match_result = any(file_regex_match_list)
+            
+            if show_info:
+                print(f"  FILE {f}, match: {file_match_result} ({m_result})")
+                
+            
+            # add match results as file patterns
+            if file_match_result:
+                for regex_match_result in regex_match_result_list:
+                    fg_list = filegroup_dict.get(regex_match_result,[])
+                    paths = filelist[f]["path"]
+                    for p in paths:
+                        fp = os.path.join(p,f)
+                        fg_list.append(fp)
+                    filegroup_dict[regex_match_result] = fg_list
+                    if single_match:
+                        break
+                    
+        return filegroup_dict
 
-        return filegroups        
+    def analyze_file_groups(filegroups:dict,regex_list:list=[],
+                            file_match_type:str="ANY",filegroup_match_type:str="ANY",
+                            show_info:bool=False):
+        """ 
+            gets filegroups (as retrieved from method get file groups)
+            analyses whether each files does match to all/any regex rules 
+            supplied in a list. 
+            Also returns matching result whether
+            any / all files in a file group did match
+            file_match_type can be ALL / ANY (all/any regex rules need to match on file level)
+            filegroup_match_type ALL / ANY: is returning true if all / any file_match_type rule
+            checks did return true within a filegroup. If regex list is empty True is returned by
+            default
+        """
+
+        if file_match_type != "ALL":
+            file_match_type = "ANY"
+
+        if filegroup_match_type != "ALL":
+            filegroup_match_type = "ANY"    
+        
+        if show_info:
+            print("\n--- analyze_file_groups (Persistence) ---")                  
+            print(f"    FILEGROUP MATCH TYPE: {filegroup_match_type}")
+            print(f"    FILE MATCH TYPE: [{file_match_type}] FILE REGEX RULES: {regex_list} \n")
+
+        match_result_dict = {}
+        filegroup_list_dict = {}
+
+        for fg,filelist in filegroups.items():
+
+            n_files = len(filelist)
+            if show_info:
+                print(f"FILEGROUP: {fg}, num files: {n_files}")
+            filegroup_match_result = False
+            filegroup_match_list = []
+
+            file_list_dict = {}
+            filegroup_result_dict = {}
+
+            for f in filelist:        
+                #file_match_list = []
+                #file_match_result = False        
+
+                # list of regex matches per file
+                file_regex_match_list = []                
+                m_result = ""
+                for r in regex_list:            
+                    m = re.match(r,f)
+                    m_result = ""
+                    if m:
+                        file_regex_match_list.append(True)
+                        m_result += (m.groups()[0]+", ")
+                    else:
+                        file_regex_match_list.append(False)
+                        m_result += "None, "
+
+                file_match_result = False
+
+                if file_match_type == "ALL":
+                    file_match_result = all(file_regex_match_list)
+                else:
+                    file_match_result = any(file_regex_match_list)
+                
+                # special case: empty regex list defaults to true
+                if not regex_list:
+                    file_match_result = True
+                
+                if show_info:
+                    print(f"  FILE {f}, match: {file_match_result} ({m_result})")
+
+                filegroup_match_list.append(file_match_result)
+                file_list_dict[f] = file_match_result 
+
+            # get match result on filegroup level
+            if filegroup_match_type == "ALL":
+                filegroup_match_result = all(filegroup_match_list)
+            else:
+                filegroup_match_result = any(filegroup_match_list)
+                
+            # special case: Empty Regex List always defaults to True
+            if not regex_list:
+                filegroup_match_result = True
+            
+            if show_info:
+                print(f"  FILEGROUP MATCH [{filegroup_match_type}]: {filegroup_match_result}")
+
+            filegroup_result_dict["filegroup_match"] = filegroup_match_result
+            filegroup_result_dict["file_match_dict"] = file_list_dict
+            filegroup_result_dict["num_files"] = n_files
+
+            filegroup_list_dict[fg] = filegroup_result_dict
+
+        return filegroup_list_dict
+
+    def group_and_analyze_files( fp:str="",file_group_regex_list:list=[],
+                                 file_group_match_type:str="ANY",file_regex_list:list=[] ,
+                                 file_match_type:str="ANY",file_group_match_type_analyze:str="ANY",
+                                 file_group_single_match:bool=True,show_info:bool=False):
+        """ for a given file path, with a list of regexes bundle files
+            into groups. Within these groups you can further analyze
+            whether any or all files within a group meet some criteria
+            defined by another regex list. Can be useful to identify duplicates
+            , files belonging to a workflow, files with a similar name and operate on them
+            (for example deleting them)
+            Parameters
+            - fp: file path
+            - file_group_regex_list: regex for getting groups for files belonging together
+            - file_group_match_type: (ALL/ANY) either all or any regexes so that file name matches pattern
+            - file_regex_list: regex to filter files in resulting file groups ".*(dng)$"
+            - file_match_type: file check to fit regexes given in file_regex_list (ALL/ANY)
+            - file_group_match_type_analyze: files in a file group need to match (ALL/ANY)
+            - file_group_single_match: Only add a file match when a file matches to criteria for first occurence
+                                    Avoids double listing of file paths in result list                        
+            - show_info: display info
+        """
+            
+        # get file groups
+        fg = Persistence.get_file_groups(fp,file_group_regex_list,file_match_type=file_group_match_type,
+                            single_match=file_group_single_match,show_info=show_info)
+
+
+        # do the file analysis based on file name
+        fa = Persistence.analyze_file_groups(fg,file_regex_list,file_match_type=file_match_type,
+                                    filegroup_match_type=file_group_match_type_analyze,
+                                    show_info=show_info)        
+        
+        return fa        
