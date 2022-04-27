@@ -1144,7 +1144,7 @@ class Persistence:
                 if number_idx is not None:
                     number_idx += 1
                 print(s_fileinfo)
-            print(f"\nFolder {p}, {num_files} files")
+            print(f"\nFolder ({num_files} files)\n{p}")
             print("----------------------------------------------")
         now = datetime.now()
         print(f"Date: {now.replace(microsecond=0)}, Number of Files:{(number_idx-start_number)}")
@@ -1277,3 +1277,35 @@ class Persistence:
                 print(traceback.format_exc())           
         
         return (delete_folders,delete_files)
+
+    @staticmethod
+    def get_file_groups(fp:str="",r:str="^(.{1,19})",showinfo=False):
+        """ reads all files in a given filepath fp and will return
+            groups of files in a dict that belong together, according 
+            to regex given as r. The Group name is the found regex expression
+            example 
+            fp = "C.\\ ..."
+            r = "^(.{1,19})"
+            will return groups for files thsat start with the same 19 characters of filename        
+            @TODO: EXTEND LOGIC TO A LIST OF REGEX EXPRESSIONS
+        """
+        
+        filelist = Persistence.get_file_list_mult([fp])
+        filegroups = {}
+
+        # regex first 19 Characters 
+        regex = r
+        regexpr = re.compile(regex)
+        for f in filelist.keys():
+            r = regexpr.match(f)
+            if r is not None:
+                fg_name = r.group(0)
+                # add filegroup to list
+                fg_list = filegroups.get(fg_name,[])
+                paths = filelist[f]["path"]
+                for p in paths:
+                    fp = os.path.join(p,f)
+                    fg_list.append(fp)
+                filegroups[fg_name]=fg_list    
+
+        return filegroups        

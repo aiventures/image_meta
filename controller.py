@@ -1088,7 +1088,7 @@ class Controller(object):
             if isinstance(del_ext_list,list) and isinstance(del_src_ext,str):        
 
                 if showinfo:
-                    print(f"\n##### finally: clean up metadata files with extension {del_ext_list}, do deletion: {persist} #####\n")  
+                    print(f"\n##### finally: clean up metadata files with extension {del_ext_list}, do deletion: {persist} ref ext:{del_src_ext} #####\n")  
 
                 # todo: input_ext > src_ext
                 Persistence.delete_related_files(fp=img_path, src_ext=del_src_ext, del_ext_list=del_ext_list,
