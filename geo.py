@@ -1,3 +1,4 @@
+import re
 from math import pi
 from math import sin
 from math import sqrt
@@ -129,24 +130,23 @@ class Geo:
 
     @staticmethod
     def latlon_from_osm_url(url:str):
-        """ extracts latlon information from an osm link 
-            https://www.openstreetmap.org/#map=xx/lat/lon
+        """ extracts the map part latlon information from an osm link 
+            https://www.openstreetmap.org/#map=xx/lat/lon            
+            https://www.openstreetmap.org/search?query=qd#map=xx/lat/lon"            
         """
-        url_osm = "https://www.openstreetmap.org/#map="
-        latlon = None
-        if not(isinstance(url,str) and url.startswith(url_osm) ):
-            return None
-        
-        try:
+        latlon=None
+        regex_osm="map\=(\d+)\/(.+)?\/(.+)"
+        osm_matches=re.findall(regex_osm,url)
+        if isinstance(osm_matches,list) and len(osm_matches)==1:
+            osm_matches=osm_matches[0][1:]
             #extract latlon info as float number
-            latlon = list(map(float,url[len(url_osm):].split("/")[1:]))
-            if isinstance(latlon,list) and (len(latlon)!=2):
-                latlon = None
-        except Exception:
-            print(f"--- EXCEPTION latlon_from_osm_url: {url} ---")
-            print(traceback.format_exc())    
-            return None
-        
+            try:
+                osm_matches=[float(osm_match) for osm_match in osm_matches]
+                latlon=osm_matches
+            except Exception:
+                print(f"--- EXCEPTION latlon_from_osm_url: {url} ---")
+                print(traceback.format_exc())    
+                return None            
         return latlon
 
     @staticmethod 

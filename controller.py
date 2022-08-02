@@ -342,13 +342,17 @@ class Controller(object):
         latlon_new = None
         link_list = Persistence.filter_files(f,["url"])
         for l in link_list:
+            print(f"    READING LINK ({f}): {l}")
             abs_path = str(Path(os.path.normpath(os.path.join(f,l))))
             url = Persistence.read_internet_shortcut(abs_path)
             latlon_url = Geo.latlon_from_osm_url(url)
             # get the 1st lat lon
             if latlon_url:
                 latlon_new = latlon_url
+                print(f"    LATLON: {latlon_new}")
                 break
+            else:
+                print("    NO LATLON FOUND IN LINK")
         return latlon_new
 
     @staticmethod
@@ -465,6 +469,7 @@ class Controller(object):
         default_lat_lon = template_dict.get(Controller.TEMPLATE_DEFAULT_LATLON,None)
         
         # check if there is a osm link in the working directory and get coordinates
+        print(f"work dir {work_dir}")
         url_lat_lon = Controller.get_latlon_from_url(work_dir)
         if url_lat_lon:
             if showinfo:
@@ -668,7 +673,7 @@ class Controller(object):
 
         # get reverse metadata as IPTC data 
         reverse_geo_dict = ExifTool.map_geo2exif(reverse_geo)
-
+        print(f"        Image Description: {reverse_geo_dict.get('ImageDescription','<NO DESCRIPTION>')}")
         # add additional parameters     
         geo_additional = Geo.get_exifmeta_from_latlon(latlon=latlon,altitude=altitude,timestamp=utc_timestamp)    
         reverse_geo_dict.update(geo_additional)

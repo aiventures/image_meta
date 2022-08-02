@@ -563,7 +563,7 @@ class ExifTool(object):
         # get lens focal length aperture and ISO
         lens = metadict.get("LensModel","")
         if lens == "":
-            lens = metadict.get("LensInfo","")
+            lens = metadict.get("LensInfo","MANUAL")
         elif lens == "----":
             lens = "MANUAL"
         tech_params_out.append(lens)
