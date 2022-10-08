@@ -85,7 +85,7 @@ class ExifTool(object):
     
     # Camera
     IMG_SEGMENT_CAM = [ 'Make', 'Model', 'ExposureTime', 'ShutterSpeedValue', 'ShutterSpeed','ISO','ScaleFactor35efl'
-                        ,'ExposureCompensation','FocusMode','CircleOfConfusion']
+                        ,'ExposureCompensation','FocusMode','CircleOfConfusion','PictureEffect','PictureProfile']
     # Lens
     IMG_SEGMENT_LNS = [ 'FNumber', 'ApertureValue', 'Aperture','MaxApertureValue', 'FocalLength','LensFormat', 
                         'LensSpecFeatures', 'LensMount2', 'LensMount', 'LensType',   'FOV', 'FocalLength35efl', 
@@ -132,7 +132,8 @@ class ExifTool(object):
     # FocusMode:AF-S  OriginatingProgram:None | 
     IMG_SEG_TECH_USED = ["Make","Model","LensMount","LensModel","LensInfo","ExposureTime","ISO","Aperture",
                          "FocalLength","ScaleFactor35efl","FocalLengthIn35mmFormat", "FOV","LensFormat","CircleOfConfusion",
-                         "HyperfocalDistance","LightValue","ExposureCompensation","FocusMode","FocusDistance2","Software"]
+                         "HyperfocalDistance","LightValue","ExposureCompensation","FocusMode","FocusDistance2","Software",
+                         "PictureEffect","PictureProfile"]
 
     # image metadata that can be augmented (= metadata can be blended by template files)
     IMG_SEG_AUGMENTED = ["Copyright","CopyrightNotice","Credit","Source","OriginalTransmissionReference","DateCreated",
@@ -598,7 +599,18 @@ class ExifTool(object):
         # s += " "+iso
         # s = s.strip()
         # tech_params_out.append(s)
-        
+
+        # picture effect and picture profile 
+        pic_effect = "PictureEffect "+metadict.get("PictureEffect")
+        if pic_effect:
+            hier_tech_params_out.append((hier_cam + "PictureEffect" + ExifTool.HIER_SEP + pic_effect))
+            tech_params_out.append(pic_effect)            
+        pic_profile = "PictureProfile "+metadict.get("PictureProfile")
+        if pic_profile:
+            hier_tech_params_out.append((hier_cam + "PictureProfile" + ExifTool.HIER_SEP + pic_profile))
+            tech_params_out.append(pic_profile) 
+
+
         # photonerd params :-)
         coc = metadict.get("CircleOfConfusion")
         if not coc is None:
