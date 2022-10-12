@@ -98,7 +98,7 @@ class Util:
         delta_time = ts_gps - ts_cam
 
         if debug is True:
-            print(f"Camera:{time_camera} GPS:{time_gps} Time Offset:{(delta_time//timedelta(seconds=1))}")
+            print(f"GPS:{time_gps} - Camera:{time_camera} = Time Offset:{(delta_time//timedelta(seconds=1))}")
 
         return delta_time        
 
