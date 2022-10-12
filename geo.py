@@ -15,7 +15,7 @@ import traceback
 class Geo:
     """ Geo calculations"""
 
-    RADIUS_EARTH = 6371 #Earth Radius in kilometers 
+    RADIUS_EARTH = 6371 #Earth Radius in kilometers
 
     GEOHACK_URL = "https://geohack.toolforge.org/geohack.php?params="
     NOMINATIM_REVERSE_URL    = "https://nominatim.openstreetmap.org/reverse"
@@ -33,10 +33,10 @@ class Geo:
         y = cos(lon)*lat_radius
         z = sin(lat)*radius
         return (x,y,z)
-    
+
     @staticmethod
     def get_distance(latlon1,latlon2,radius=RADIUS_EARTH,debug=False,cartesian_length=False):
-        """ calculates distance (wither cartesian (default) or arc segment length) 
+        """ calculates distance (wither cartesian (default) or arc segment length)
             of two tuples (lat,long) into cartesian in kilometers  """
         c1 = Geo.latlon2cartesian(latlon1)
         c2 = Geo.latlon2cartesian(latlon2)
@@ -49,9 +49,9 @@ class Geo:
                 print("Arc Distance:",distance_arc,"Distance:",distance," Difference:",(distance_arc-distance))
             distance = distance_arc
         if debug is True:
-            print("Delta Coordinates (X,Y,Z):",delta_c,"\n Distance:",distance)              
-        return distance  
-    
+            print("Delta Coordinates (X,Y,Z):",delta_c,"\n Distance:",distance)
+        return distance
+
     @staticmethod
     def get_exifmeta_from_latlon(latlon,altitude=None,timestamp:int=None):
         """Creates Exif Metadata Dictionary for GPS Coordinates"""
@@ -69,21 +69,21 @@ class Geo:
             latref = "S"
         if lon < 0:
             lonref = "W"
-        
+
         geo_dict["GPSLatitude"] = lat
         geo_dict["GPSLatitudeRef"] = latref
         geo_dict["GPSLongitude"] = lon
         geo_dict["GPSLongitudeRef"] = lonref
-               
+
         if altitude is not None:
             geo_dict["GPSAltitudeRef"] = "above"
             geo_dict["GPSAltitude"] = round(altitude,0)
-        
+
         if isinstance(timestamp,int):
             geo_dict["GPSDateStamp"] = datetime.utcfromtimestamp(timestamp).strftime("%Y:%m:%d")
-            geo_dict["GPSTimeStamp"] = datetime.utcfromtimestamp(timestamp).strftime("%H:%M:%S") 
+            geo_dict["GPSTimeStamp"] = datetime.utcfromtimestamp(timestamp).strftime("%H:%M:%S")
 
-        return geo_dict 
+        return geo_dict
 
     @staticmethod
     def dec2geo(dec):
@@ -110,7 +110,7 @@ class Geo:
             lon_ref = "W"
         coord_s = "_".join([str(abs(lat)),lat_ref,str(abs(lon)),lon_ref])
         return coord_s
-    
+
     @staticmethod
     def geohack2dec(geohack:str):
         """ converts geohack string into geo tuple """
@@ -130,9 +130,9 @@ class Geo:
 
     @staticmethod
     def latlon_from_osm_url(url:str):
-        """ extracts the map part latlon information from an osm link 
-            https://www.openstreetmap.org/#map=xx/lat/lon            
-            https://www.openstreetmap.org/search?query=qd#map=xx/lat/lon"            
+        """ extracts the map part latlon information from an osm link
+            https://www.openstreetmap.org/#map=xx/lat/lon
+            https://www.openstreetmap.org/search?query=qd#map=xx/lat/lon"
         """
         latlon=None
         regex_osm="map\=(\d+)\/(.+)?\/(.+)"
@@ -145,11 +145,11 @@ class Geo:
                 latlon=osm_matches
             except Exception:
                 print(f"--- EXCEPTION latlon_from_osm_url: {url} ---")
-                print(traceback.format_exc())    
-                return None            
+                print(traceback.format_exc())
+                return None
         return latlon
 
-    @staticmethod 
+    @staticmethod
     def latlon2osm(latlon,detail=18):
         """ converts latlon to osm url """
         # https://www.openstreetmap.org/#map=<detail>/<lat>/<lon>
@@ -178,7 +178,7 @@ class Geo:
             trg_dict[("_".join([prefix,"keys"]))] = keys
             return trg_dict
 
-        property_dict = {}  
+        property_dict = {}
 
         # additional parameter from url request
         property_dict["nominatim_url"] = geo_json.get("nominatim_url")
@@ -206,7 +206,7 @@ class Geo:
         property_dict["features_type"] = features.get("type")
 
         # Properties
-        # 'place_id', 'osm_type', 'osm_id', 'place_rank', 'category', 'type', 'importance', 
+        # 'place_id', 'osm_type', 'osm_id', 'place_rank', 'category', 'type', 'importance',
         # 'addresstype', 'name', 'display_name']
         try:
             properties = features["properties"]
@@ -225,14 +225,14 @@ class Geo:
         for k,v in properties.items():
                 d = add2dict(v,k)
                 property_dict.update(d)
-            
+
         # list lat_min lon_min lat_max lat min
         try:
             bbox = list(map(lambda v:float(v),features.get("bbox")))
             bbox = list(map(lambda c:round(c,5),bbox))
             latlon_min = [bbox[1],bbox[0]]
             latlon_max = [bbox[3],bbox[2]]
-            property_dict["latlon_min"] = latlon_min 
+            property_dict["latlon_min"] = latlon_min
             property_dict["latlon_max"] = latlon_max
             # calculate distance in m
             property_dict["distance_m"] = round(Geo.get_distance(latlon_min,latlon_max)*1000)
@@ -255,17 +255,17 @@ class Geo:
             print("No Geometry Found in OSM Data")
             property_dict["latlon"] = None
             property_dict["geometry_type"] = None
-        
+
         if debug is True:
             print(f"----Geo Dictionary----")
             for k,v in property_dict.items():
                 print(f"\t{k} -> {str(v)} ")
-        
+
         return property_dict
-    
+
     @staticmethod
     def geo_reverse_from_nominatim(latlon,zoom=18,addressdetails=18,debug=False)->dict:
-        """ Executes reverse search on nominatim geoserver, returns result als flattened dict 
+        """ Executes reverse search on nominatim geoserver, returns result als flattened dict
             specification https://nominatim.org/release-docs/latest/api/Reverse/
             'https://nominatim.openstreetmap.org/reverse?format=geojson&lat=48.7791304&lon=9.186206&zoom=18&addressdetails=18'
         """
@@ -277,18 +277,18 @@ class Geo:
         params["addressdetails"] = str(addressdetails)
         zoom = str(zoom)
         params["zoom"] = zoom
+
         response = requests.get(url,params)
 
         geo_json = response.json()
-
         geo_json["nominatim_url"] = response.url
         geo_json["http_status"] = response.status_code
         geo_json["addressdetails"] = zoom
 
-        geo_dict = Geo.nominatimreverse2dict(geo_json,debug=debug) 
+        geo_dict = Geo.nominatimreverse2dict(geo_json,debug=debug)
 
         return geo_dict
-    
+
     @staticmethod
     def get_nearest_gps_waypoint(latlon_ref,gps_fileref,date_s_ref=None,tz = 'Europe/Berlin',dist_max=1000,debug=False)->dict:
         """ Gets closest GPS point in a gps track for given latlon coordinate and time difference if datetime string is given
@@ -296,7 +296,7 @@ class Geo:
             gps_fileref -- filepath to gpsx file
             date_s_ref  -- datetime of reference point  "%m:%d:%Y %H:%M:%S"
             tz          -- timezone (pytz.tzone)
-            distmax     -- maximum distance in m whether point will be used as minimum distance (default 1000m)  
+            distmax     -- maximum distance in m whether point will be used as minimum distance (default 1000m)
             debug       -- outpur additional information
         """
 
@@ -306,11 +306,11 @@ class Geo:
 
         tz = 'Europe/Berlin'
         dt_ref = Util.get_datetime_from_string(datetime_s=date_s_ref,local_tz=tz)
-        
+
         # geohack url
         url_geohack = Geo.GEOHACK_URL+Geo.latlon2geohack(latlon_ref)
 
-        # load gps data 
+        # load gps data
         gps_coords = Persistence.read_gpx(gpsx_path=gps_fileref)
 
         if not gps_coords:
@@ -324,7 +324,7 @@ class Geo:
         timestamp_min = min(timestamps)
         timestamp_max = max(timestamps)
 
-        # utc from (utc) timestamp 
+        # utc from (utc) timestamp
         dt_min_utc = datetime.utcfromtimestamp(timestamp_min)
         dt_max_utc = datetime.utcfromtimestamp(timestamp_max)
 
@@ -340,18 +340,18 @@ class Geo:
 
         if debug:
             dist_max = int(1000*Geo.get_distance(latlon_ref,latlon_max))
-            dist_min = int(1000*Geo.get_distance(latlon_ref,latlon_min))    
-            dist_track = int(1000*Geo.get_distance(latlon_max,latlon_min))    
-            print(f"--- Track '{geo_min.get('track_name','Unknown Track')}': {num} data points, duration {dt_max-dt_min}") 
-            print(f"    Timezone: {tz}")    
+            dist_min = int(1000*Geo.get_distance(latlon_ref,latlon_min))
+            dist_track = int(1000*Geo.get_distance(latlon_max,latlon_min))
+            print(f"--- Track '{geo_min.get('track_name','Unknown Track')}': {num} data points, duration {dt_max-dt_min}")
+            print(f"    Timezone: {tz}")
             print(f"    Start latlon: {latlon_min} / Datetime {dt_min}")
-            print("                  ",(Geo.GEOHACK_URL+Geo.latlon2geohack(latlon_min))) 
+            print("                  ",(Geo.GEOHACK_URL+Geo.latlon2geohack(latlon_min)))
             print(f"    End latlon: {latlon_max} / Datetime {dt_max}")
-            print("                ",(Geo.GEOHACK_URL+Geo.latlon2geohack(latlon_max)))     
+            print("                ",(Geo.GEOHACK_URL+Geo.latlon2geohack(latlon_max)))
             print(f"--- Reference latlon: {latlon_ref} / Datetime {dt_ref}")
             print("    Geohack url:",url_geohack)
             print(f"--- Distance: start-ref {dist_min}m, end-ref {dist_max}m, start-end {dist_track}m")
-        
+
         timestamp_min = None
 
         for timestamp,gps_coord in gps_coords.items():
@@ -371,13 +371,13 @@ class Geo:
                     gps_min["timedelta_from_ref"] =  int(timedelta.total_seconds(datetime_min-dt_ref))
                 else:
                     gps_min["timedelta_from_ref"] =  None
-                gps_min["url_geohack"] = Geo.GEOHACK_URL+Geo.latlon2geohack(latlon)        
+                gps_min["url_geohack"] = Geo.GEOHACK_URL+Geo.latlon2geohack(latlon)
 
         if gps_min.get("distance_m",dist_max) < dist_max:
             if debug:
                 print(f"--- Nearest GPS Trackpoint")
                 Util.print_dict_info(d=gps_min)
         else:
-            print(f"no gps points found in vicinity of {dist_min} m")        
-        
+            print(f"no gps points found in vicinity of {dist_min} m")
+
         return gps_min
