@@ -707,7 +707,9 @@ class Controller(object):
 
         # gps data / calculate time offset (calculated in prepare_execution) 
         gps_datetime_image = params[Controller.TEMPLATE_CALIB_IMG]
+        # datetime of gpx calibration image in config file (CALIB_DATETIME)
         gps_datetime = params[Controller.TEMPLATE_CALIB_DATETIME]
+
         gps_offset = params[Controller.TEMPLATE_CALIB_OFFSET]
 
         # extension for metadata file
@@ -784,7 +786,8 @@ class Controller(object):
             if debug:
                 print(f"\n--- Controller.prepare_img_write BEGIN \n    PROCESS {fileref}")
 
-            creation_date = metadata_dict.get("CreateDate",None)            
+            creation_date = metadata_dict.get("CreateDate",None)
+            cam_creation_date=creation_date
             creation_timestamp = Util.get_localized_datetime(dt_in=creation_date,tz_in=timezone,tz_out="UTC",
                                                              debug=False,as_timestamp=True) 
             if not ( creation_timestamp is None or gps_offset is None ):                                                 
@@ -873,11 +876,21 @@ class Controller(object):
             augmented_meta.update(gps_data)
 
             if debug:
+                    
                 print(f"\n    >> FILE {fileref}")
-                print(f"       Corrected timestamp {creation_timestamp} offset {gps_offset}")
-                print(f"       Datetime IMG Creation {creation_date} Corrected (UTC) {creation_datetime} GPS (UTC) {datetime_gpx}")                    
-                print(f"                GPS timestamp {timestamp_gpx} UTC {datetime_gpx} latlon: {latlon}")   
-                print(f"                OSM {osm_link}")   
+                print(f"\n    *** DATETIME ***")  
+                print(f"        Cam Creation Date        : {cam_creation_date} ")
+                if not gps_offset:                    
+                    print("****    WARNING GPS OFFSET COULDNT BE RETRIEVED, check if all files are present")                
+                    print("        GPS OFFSET WILL BE SET TO ZERO AND PROCESSED ANYWAY")                                    
+                else:
+                    print(f"        Cam Offset               : {gps_offset} (T(GPS))=T(CAM)+GPS_OFFSET")                
+                print(f"        Corrreted Camera UTC     : {creation_datetime} (TIMESTAMP {creation_timestamp})")                
+                print(f"        GPS UTC FOUND IN LOG     : {datetime_gpx} ")
+                print(f"        GPS OFFSET               : {(datetime_gpx-creation_datetime).total_seconds()} seconds ") 
+                print(f"        latlon                   : {latlon}")   
+                print(f"        OSM                      : {osm_link}") 
+                              
                 if verbose:
                     print("      METADATA STORED IN IMAGE")
                     Util.print_dict_info(d=metadata_dict) 
