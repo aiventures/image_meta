@@ -600,17 +600,19 @@ class ExifTool(object):
         # s = s.strip()
         # tech_params_out.append(s)
 
-        # picture effect and picture profile
-        pic_effect = "PictureEffect "+metadict.get("PictureEffect")
-        if pic_effect:
-            if not pic_effect == "Off":
+        # picture effect and picture profile        
+        pic_effect =metadict.get("PictureEffect")        
+        if pic_effect:            
+            if not pic_effect == "Off":                
                 hier_tech_params_out.append((hier_cam + "PictureEffect" + ExifTool.HIER_SEP + pic_effect))
+                pic_effect = "PictureEffect "+ pic_effect
                 tech_params_out.append(pic_effect)
-        pic_profile = "PictureProfile "+metadict.get("PictureProfile")
-        if pic_profile:
-            hier_tech_params_out.append((hier_cam + "PictureProfile" + ExifTool.HIER_SEP + pic_profile))
-            tech_params_out.append(pic_profile)
 
+        pic_profile = metadict.get("PictureProfile")
+        if pic_profile:            
+            hier_tech_params_out.append((hier_cam + "PictureProfile" + ExifTool.HIER_SEP + pic_profile))
+            pic_profile = "PictureProfile "+ pic_profile
+            tech_params_out.append(pic_profile)
 
         # photonerd params :-)
         coc = metadict.get("CircleOfConfusion")

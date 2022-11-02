@@ -882,12 +882,15 @@ class Controller(object):
                 print(f"        Cam Creation Date        : {cam_creation_date} ")
                 if not gps_offset:                    
                     print("****    WARNING GPS OFFSET COULDNT BE RETRIEVED, check if all files are present")                
-                    print("        GPS OFFSET WILL BE SET TO ZERO AND PROCESSED ANYWAY")                                    
+                    print("        GPS OFFSET WILL BE SET TO ZERO AND PROCESSED ANYWAY")
                 else:
                     print(f"        Cam Offset               : {gps_offset} (T(GPS))=T(CAM)+GPS_OFFSET")                
                 print(f"        Corrreted Camera UTC     : {creation_datetime} (TIMESTAMP {creation_timestamp})")                
                 print(f"        GPS UTC FOUND IN LOG     : {datetime_gpx} ")
-                print(f"        GPS OFFSET               : {(datetime_gpx-creation_datetime).total_seconds()} seconds ") 
+                gps_offset_time=0
+                if datetime_gpx and creation_datetime:
+                    gps_offset_time=(datetime_gpx-creation_datetime).total_seconds()
+                print(f"        GPS OFFSET               : {gps_offset_time} seconds ") 
                 print(f"        latlon                   : {latlon}")   
                 print(f"        OSM                      : {osm_link}") 
                               
