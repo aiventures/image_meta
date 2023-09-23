@@ -6,3 +6,8 @@
    - Use Tag template to write category / image tags into EXIF / IPTC metadata
    - Support of Hierarchical Subject metadata / and import of metadata hierarchy   
 """
+import logging
+from logging import NullHandler
+
+logger=logging.getLogger(__name__)
+logger.addHandler(NullHandler())
